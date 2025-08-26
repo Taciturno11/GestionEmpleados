@@ -15,7 +15,8 @@ router.get('/', authenticateToken, async (req, res) => {
       query = `
         SELECT 
           t.*,
-          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
+          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.Emisor != @userDNI) as MensajesNoLeidos
         FROM Tareas t
         LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
         ORDER BY t.FechaFin ASC
@@ -25,7 +26,8 @@ router.get('/', authenticateToken, async (req, res) => {
       query = `
         SELECT 
           t.*,
-          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
+          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.Emisor != @userDNI) as MensajesNoLeidos
         FROM Tareas t
         LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
         WHERE t.Responsable = @userDNI 
@@ -381,6 +383,54 @@ router.get('/:id/mensajes', authenticateToken, async (req, res) => {
       number: error.number,
       state: error.state
     });
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// PUT - Marcar mensajes como leídos
+router.put('/:id/mensajes/leer', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('👁️ Marcando mensajes como leídos para tarea:', id, 'Usuario:', req.user.dni);
+    
+    const pool = await connectDB();
+    
+    // Verificar que el usuario puede ver esta tarea
+    let query = '';
+    if (req.user.isSupremeBoss) {
+      query = 'SELECT * FROM Tareas WHERE Id = @id';
+    } else {
+      query = 'SELECT * FROM Tareas WHERE Id = @id AND Responsable = @userDNI';
+    }
+    
+    const tareaResult = await pool.request()
+      .input('id', id)
+      .input('userDNI', req.user.dni)
+      .query(query);
+    
+    if (tareaResult.recordset.length === 0) {
+      console.log('❌ Tarea no encontrada para marcar mensajes como leídos');
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    
+    console.log('✅ Tarea encontrada, marcando mensajes como leídos');
+    
+    // Marcar todos los mensajes no leídos de otros usuarios como leídos
+    const result = await pool.request()
+      .input('tareaId', id)
+      .input('userDNI', req.user.dni)
+      .query(`
+        UPDATE MensajesObservaciones 
+        SET Leido = 1 
+        WHERE TareaId = @tareaId 
+        AND Emisor != @userDNI 
+        AND Leido = 0
+      `);
+    
+    console.log('✅ Mensajes marcados como leídos. Filas afectadas:', result.rowsAffected[0]);
+    res.json({ message: 'Mensajes marcados como leídos', mensajesActualizados: result.rowsAffected[0] });
+  } catch (error) {
+    console.error('❌ Error marcando mensajes como leídos:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

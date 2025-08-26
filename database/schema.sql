@@ -48,12 +48,14 @@ CREATE TABLE MensajesObservaciones (
   Emisor NVARCHAR(50) NOT NULL,
   Mensaje NVARCHAR(1000) NOT NULL,
   FechaCreacion DATETIME DEFAULT GETDATE(),
+  Leido BIT DEFAULT 0,
   FOREIGN KEY (TareaId) REFERENCES Tareas(Id) ON DELETE CASCADE
 );
 
 -- Índice para mejorar el rendimiento de las consultas
 CREATE INDEX IX_MensajesObservaciones_TareaId ON MensajesObservaciones(TareaId);
 CREATE INDEX IX_MensajesObservaciones_FechaCreacion ON MensajesObservaciones(FechaCreacion);
+CREATE INDEX IX_MensajesObservaciones_Leido ON MensajesObservaciones(Leido);
 
 -- Insertar datos de ejemplo
 INSERT INTO Tareas (Titulo, Responsable, FechaInicio, FechaFin, Prioridad, Estado, Observaciones) VALUES
