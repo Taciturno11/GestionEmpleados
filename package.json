@@ -4,7 +4,7 @@
   "description": "Sistema de Gestión de Tareas y Feedback",
   "scripts": {
     "server": "cd server && npm run dev",
-    "client": "cd client && npm start",
+    "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
