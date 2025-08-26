@@ -16,7 +16,8 @@ router.get('/', authenticateToken, async (req, res) => {
         SELECT 
           t.*,
           LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
-          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.Emisor != @userDNI) as MensajesNoLeidos
+          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.Emisor != @userDNI) as MensajesNoLeidos,
+          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
         FROM Tareas t
         LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
         ORDER BY t.FechaFin ASC
@@ -27,7 +28,8 @@ router.get('/', authenticateToken, async (req, res) => {
         SELECT 
           t.*,
           LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
-          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.Emisor != @userDNI) as MensajesNoLeidos
+          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.Emisor != @userDNI) as MensajesNoLeidos,
+          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
         FROM Tareas t
         LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
         WHERE t.Responsable = @userDNI 
@@ -293,6 +295,22 @@ router.put('/:id', authenticateToken, async (req, res) => {
       .input('observaciones', observaciones || null)
       .input('userDNI', req.user.dni)
       .query(query);
+
+    // Si el Jefe Supremo está agregando una observación, crear un mensaje en MensajesObservaciones
+    if (req.user.isSupremeBoss && observaciones && observaciones.trim()) {
+      console.log('👑 Jefe Supremo agregando observación, creando mensaje en chat');
+      
+      await pool.request()
+        .input('tareaId', id)
+        .input('emisor', req.user.dni)
+        .input('mensaje', observaciones.trim())
+        .query(`
+          INSERT INTO MensajesObservaciones (TareaId, Emisor, Mensaje)
+          VALUES (@tareaId, @emisor, @mensaje)
+        `);
+      
+      console.log('✅ Mensaje creado en chat para la observación del Jefe Supremo');
+    }
 
     console.log('✅ Tarea actualizada. Filas afectadas:', result.rowsAffected[0]);
 
