@@ -12,13 +12,24 @@ router.get('/', authenticateToken, async (req, res) => {
 
     if (req.user.isSupremeBoss) {
       // Jefe supremo ve todas las tareas
-      query = 'SELECT * FROM Tareas ORDER BY FechaFin ASC';
+      query = `
+        SELECT 
+          t.*,
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable
+        FROM Tareas t
+        LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+        ORDER BY t.FechaFin ASC
+      `;
     } else {
       // Usuario regular ve solo sus tareas (por responsable)
       query = `
-        SELECT * FROM Tareas 
-        WHERE Responsable = @userDNI 
-        ORDER BY FechaFin ASC
+        SELECT 
+          t.*,
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable
+        FROM Tareas t
+        LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+        WHERE t.Responsable = @userDNI 
+        ORDER BY t.FechaFin ASC
       `;
       params = { userDNI: req.user.dni };
     }
@@ -44,7 +55,7 @@ router.get('/reporte-empleados', authenticateToken, isSupremeBoss, async (req, r
       .query(`
         SELECT 
           e.DNI,
-          e.Nombres + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as Nombre,
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as Nombre,
           CASE 
             WHEN e.DNI = '44991089' THEN 'Jefe Supremo'
             WHEN e.CargoID = 8 THEN 'Jefe'
@@ -346,19 +357,19 @@ router.get('/:id/mensajes', authenticateToken, async (req, res) => {
     // Obtener los mensajes del chat
     const mensajesResult = await pool.request()
       .input('tareaId', id)
-      .query(`
-        SELECT 
-          m.Id,
-          m.TareaId,
-          m.Emisor,
-          m.Mensaje,
-          m.FechaCreacion,
-          e.Nombres + ' ' + e.ApellidoPaterno as NombreEmisor
-        FROM MensajesObservaciones m
-        LEFT JOIN PRI.Empleados e ON m.Emisor = e.DNI
-        WHERE m.TareaId = @tareaId
-        ORDER BY m.FechaCreacion ASC
-      `);
+             .query(`
+         SELECT 
+           m.Id,
+           m.TareaId,
+           m.Emisor,
+           m.Mensaje,
+           m.FechaCreacion,
+           LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as NombreEmisor
+         FROM MensajesObservaciones m
+         LEFT JOIN PRI.Empleados e ON m.Emisor = e.DNI
+         WHERE m.TareaId = @tareaId
+         ORDER BY m.FechaCreacion ASC
+       `);
     
     console.log('✅ Mensajes obtenidos:', mensajesResult.recordset.length, 'mensajes');
     res.json(mensajesResult.recordset);
@@ -422,21 +433,21 @@ router.post('/:id/mensajes', authenticateToken, async (req, res) => {
     const mensajeId = result.recordset[0].Id;
     console.log('✅ Mensaje insertado con ID:', mensajeId);
     
-    // Obtener el mensaje recién creado con el nombre del emisor
-    const mensajeCreado = await pool.request()
-      .input('mensajeId', mensajeId)
-      .query(`
-        SELECT 
-          m.Id,
-          m.TareaId,
-          m.Emisor,
-          m.Mensaje,
-          m.FechaCreacion,
-          e.Nombres + ' ' + e.ApellidoPaterno as NombreEmisor
-        FROM MensajesObservaciones m
-        LEFT JOIN PRI.Empleados e ON m.Emisor = e.DNI
-        WHERE m.Id = @mensajeId
-      `);
+         // Obtener el mensaje recién creado con el nombre del emisor
+     const mensajeCreado = await pool.request()
+       .input('mensajeId', mensajeId)
+       .query(`
+         SELECT 
+           m.Id,
+           m.TareaId,
+           m.Emisor,
+           m.Mensaje,
+           m.FechaCreacion,
+           LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as NombreEmisor
+         FROM MensajesObservaciones m
+         LEFT JOIN PRI.Empleados e ON m.Emisor = e.DNI
+         WHERE m.Id = @mensajeId
+       `);
     
     console.log('✅ Mensaje creado:', mensajeCreado.recordset[0]);
     res.status(201).json(mensajeCreado.recordset[0]);

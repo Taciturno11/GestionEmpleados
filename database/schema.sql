@@ -41,6 +41,7 @@ CREATE TABLE RespuestasFeedback (
 );
 
 -- Tabla para mensajes del chat de observaciones
+
 CREATE TABLE MensajesObservaciones (
   Id INT IDENTITY(1,1) PRIMARY KEY,
   TareaId INT NOT NULL,
