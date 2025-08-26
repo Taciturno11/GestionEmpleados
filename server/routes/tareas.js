@@ -446,6 +446,12 @@ router.put('/:id/mensajes/leer', authenticateToken, async (req, res) => {
       `);
     
     console.log('✅ Mensajes marcados como leídos. Filas afectadas:', result.rowsAffected[0]);
+    
+    // Verificar que se actualizaron los mensajes
+    if (result.rowsAffected[0] > 0) {
+      console.log('✅ Contador de mensajes actualizado correctamente');
+    }
+    
     res.json({ message: 'Mensajes marcados como leídos', mensajesActualizados: result.rowsAffected[0] });
   } catch (error) {
     console.error('❌ Error marcando mensajes como leídos:', error);
