@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
       .query(`
         SELECT DNI, Nombres, ApellidoPaterno, ApellidoMaterno, CargoID 
         FROM PRI.Empleados 
-        WHERE DNI = @dni AND (CargoID IN (4, 8) OR DNI IN ('44991089', '73766815'))
+        WHERE DNI = @dni AND (CargoID IN (4, 8) OR DNI = '44991089')
       `);
 
     if (result.recordset.length === 0) {
@@ -45,7 +45,7 @@ router.post('/login', async (req, res) => {
         dni: user.DNI, 
         nombre: nombreCompleto, 
         cargoId: user.CargoID,
-        isSupremeBoss: user.DNI === '44991089' || user.DNI === '73766815'
+        isSupremeBoss: user.DNI === '44991089'
       }, 
       JWT_SECRET, 
       { expiresIn: '24h' }
@@ -58,7 +58,7 @@ router.post('/login', async (req, res) => {
         dni: user.DNI,
         nombre: nombreCompleto,
         cargoId: user.CargoID,
-        isSupremeBoss: user.DNI === '44991089' || user.DNI === '73766815'
+        isSupremeBoss: user.DNI === '44991089'
       }
     });
 
@@ -91,7 +91,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         .query(`
           SELECT DNI, Nombres, ApellidoPaterno, ApellidoMaterno, CargoID 
           FROM PRI.Empleados 
-          WHERE DNI = @dni AND (CargoID IN (4, 8) OR DNI IN ('44991089', '73766815'))
+          WHERE DNI = @dni AND (CargoID IN (4, 8) OR DNI = '44991089')
         `);
 
       if (result.recordset.length === 0) {
@@ -108,7 +108,7 @@ router.get('/me', authenticateToken, async (req, res) => {
           dni: user.DNI,
           nombre: nombreCompleto,
           cargoId: user.CargoID,
-          isSupremeBoss: user.DNI === '44991089' || user.DNI === '73766815'
+          isSupremeBoss: user.DNI === '44991089'
         }
       });
     });

@@ -22,7 +22,7 @@ const authenticateToken = (req, res, next) => {
 
 // Middleware para verificar si es jefe supremo
 const isSupremeBoss = (req, res, next) => {
-  if (req.user.dni !== '44991089' && req.user.dni !== '73766815') {
+  if (req.user.dni !== '44991089') {
     return res.status(403).json({ error: 'Acceso denegado. Solo el jefe supremo puede realizar esta acción.' });
   }
   next();

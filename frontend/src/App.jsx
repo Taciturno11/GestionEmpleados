@@ -313,10 +313,14 @@ function App() {
     e.preventDefault();
     if (!nuevoMensaje.trim() || !chatAbierto) return;
 
-    // Solo el Jefe Supremo puede enviar mensajes
+    // Verificar si el usuario puede enviar mensajes
     if (!user.isSupremeBoss) {
-      alert('Solo el Jefe Supremo puede enviar observaciones');
-      return;
+      // Los trabajadores solo pueden responder si el jefe supremo ya escribió algo
+      const mensajesJefe = mensajes[chatAbierto]?.filter(m => m.Emisor === '44991089');
+      if (!mensajesJefe || mensajesJefe.length === 0) {
+        alert('Solo puedes responder después de que el jefe supremo haya enviado una observación');
+        return;
+      }
     }
 
     try {
@@ -491,7 +495,16 @@ function App() {
                 </div>
                 <button 
                   className="bg-blue-600 text-white px-6 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
-                  onClick={() => setShowForm(!showForm)}
+                  onClick={() => {
+                    setShowForm(!showForm);
+                    // Pre-rellenar el responsable con el DNI del usuario actual
+                    if (!showForm && user) {
+                      setNuevaTarea(prev => ({
+                        ...prev,
+                        responsable: user.dni
+                      }));
+                    }
+                  }}
                 >
                   + Nueva Tarea
                 </button>
@@ -798,7 +811,7 @@ function App() {
                           {!editingTarea && (
                             <td className="px-6 py-4">
                               <div className="relative">
-                                {/* Solo mostrar botón de chat si hay mensajes del jefe supremo o si es el jefe supremo */}
+                                {/* Mostrar botón de chat si hay mensajes o si es el jefe supremo */}
                                 {(tarea.TotalMensajes > 0 || user.isSupremeBoss) && (
                                   <button
                                     onClick={() => abrirChat(tarea.Id)}
@@ -817,7 +830,7 @@ function App() {
                                 )}
                                 {/* Mostrar mensaje informativo para trabajadores cuando no hay observaciones del jefe */}
                                 {!user.isSupremeBoss && tarea.TotalMensajes === 0 && (
-                                  <div className="text-gray-400 text-xs text-center px-2 py-1" title="Esperando observación del jefe">
+                                  <div className="text-gray-400 text-xs text-center px-2 py-1" title="Esperando observación del jefe supremo">
                                     ⏳
                                   </div>
                                 )}
@@ -917,7 +930,7 @@ function App() {
                     {!user.isSupremeBoss && (
                       <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
                         <p className="text-sm text-blue-700">
-                          💡 Solo el Jefe Supremo puede enviar observaciones. Los empleados pueden ver las observaciones pero no pueden enviar mensajes.
+                          💡 Puedes responder a las observaciones del jefe supremo. Solo puedes enviar mensajes después de que él haya escrito algo.
                         </p>
                       </div>
                     )}
@@ -926,13 +939,12 @@ function App() {
                         type="text"
                         value={nuevoMensaje}
                         onChange={(e) => setNuevoMensaje(e.target.value)}
-                        placeholder={user.isSupremeBoss ? "Escribe tu observación..." : "Solo el Jefe Supremo puede enviar observaciones"}
-                        className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${!user.isSupremeBoss ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                        disabled={!user.isSupremeBoss}
+                        placeholder={user.isSupremeBoss ? "Escribe tu observación..." : "Responde a la observación del jefe..."}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                       <button
                         type="submit"
-                        disabled={!nuevoMensaje.trim() || !user.isSupremeBoss}
+                        disabled={!nuevoMensaje.trim()}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                       >
                         Enviar

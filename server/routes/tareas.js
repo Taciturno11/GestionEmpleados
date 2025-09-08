@@ -23,7 +23,7 @@ router.get('/', authenticateToken, async (req, res) => {
         ORDER BY t.FechaFin ASC
       `;
     } else {
-      // Usuario regular ve solo sus tareas (por responsable)
+      // Usuario regular ve sus tareas Y tareas donde el jefe supremo ha hecho observaciones
       query = `
         SELECT 
           t.*,
@@ -33,6 +33,10 @@ router.get('/', authenticateToken, async (req, res) => {
         FROM Tareas t
         LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
         WHERE t.Responsable = @userDNI 
+           OR EXISTS (
+             SELECT 1 FROM MensajesObservaciones m 
+             WHERE m.TareaId = t.Id AND m.Emisor = '44991089'
+           )
         ORDER BY t.FechaFin ASC
       `;
       params = { userDNI: req.user.dni };
@@ -510,9 +514,21 @@ router.post('/:id/mensajes', authenticateToken, async (req, res) => {
     
     console.log('📨 Enviando mensaje:', { id, mensaje, user: req.user.dni, isSupremeBoss: req.user.isSupremeBoss });
     
-    // Solo el Jefe Supremo puede enviar mensajes
+    // Verificar si el usuario puede enviar mensajes
     if (!req.user.isSupremeBoss) {
-      return res.status(403).json({ error: 'Solo el Jefe Supremo puede enviar observaciones' });
+      // Los trabajadores solo pueden responder si el jefe supremo ya escribió algo
+      const pool = await connectDB();
+      const mensajesResult = await pool.request()
+        .input('tareaId', id)
+        .query(`
+          SELECT COUNT(*) as totalMensajesJefe
+          FROM MensajesObservaciones 
+          WHERE TareaId = @tareaId AND Emisor = '44991089'
+        `);
+      
+      if (mensajesResult.recordset[0].totalMensajesJefe === 0) {
+        return res.status(403).json({ error: 'Solo puedes responder después de que el jefe supremo haya enviado una observación' });
+      }
     }
     
     if (!mensaje || !mensaje.trim()) {
