@@ -6,42 +6,40 @@ const { authenticateToken, isSupremeBoss } = require('../middleware/auth');
 // POST - Crear feedback (solo jefe supremo)
 router.post('/', authenticateToken, isSupremeBoss, async (req, res) => {
   try {
-    const { tareaId, receptorDNI, comentario } = req.body;
-    const emisorDNI = req.user.dni; // Jefe supremo
+    const { tareaId, mensaje } = req.body;
+    const emisor = req.user.dni; // Jefe supremo
 
-    if (!tareaId || !receptorDNI || !comentario) {
-      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+    if (!tareaId || !mensaje) {
+      return res.status(400).json({ error: 'Tarea ID y mensaje son requeridos' });
     }
 
     const pool = await connectDB();
     
-    // Verificar que la tarea existe
+    // Verificar que la tarea existe y obtener información del responsable
     const tareaResult = await pool.request()
       .input('tareaId', tareaId)
-      .query('SELECT * FROM Tareas WHERE Id = @tareaId');
+      .query(`
+        SELECT t.*, 
+               LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as NombreResponsable
+        FROM Tareas t
+        LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+        WHERE t.Id = @tareaId
+      `);
 
     if (tareaResult.recordset.length === 0) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
 
-    // Verificar que el receptor existe
-    const receptorResult = await pool.request()
-      .input('receptorDNI', receptorDNI)
-      .query('SELECT * FROM PRI.Empleados WHERE DNI = @receptorDNI AND CargoID IN (4, 8)');
+    const tarea = tareaResult.recordset[0];
 
-    if (receptorResult.recordset.length === 0) {
-      return res.status(404).json({ error: 'Usuario receptor no encontrado' });
-    }
-
-    // Crear feedback
+    // Crear feedback usando el esquema correcto
     const result = await pool.request()
       .input('tareaId', tareaId)
-      .input('emisorDNI', emisorDNI)
-      .input('receptorDNI', receptorDNI)
-      .input('comentario', comentario)
+      .input('emisor', emisor)
+      .input('mensaje', mensaje)
       .query(`
-        INSERT INTO Feedback (TareaId, EmisorDNI, ReceptorDNI, Comentario)
-        VALUES (@tareaId, @emisorDNI, @receptorDNI, @comentario);
+        INSERT INTO Feedback (TareaId, Emisor, Mensaje)
+        VALUES (@tareaId, @emisor, @mensaje);
         SELECT SCOPE_IDENTITY() as Id;
       `);
 
@@ -49,7 +47,13 @@ router.post('/', authenticateToken, isSupremeBoss, async (req, res) => {
 
     res.status(201).json({
       message: 'Feedback creado exitosamente',
-      feedbackId
+      feedbackId,
+      tarea: {
+        id: tarea.Id,
+        titulo: tarea.Titulo,
+        responsable: tarea.Responsable,
+        nombreResponsable: tarea.NombreResponsable
+      }
     });
 
   } catch (error) {
@@ -61,26 +65,25 @@ router.post('/', authenticateToken, isSupremeBoss, async (req, res) => {
 // GET - Obtener feedback recibido por el usuario
 router.get('/received', authenticateToken, async (req, res) => {
   try {
-    const receptorDNI = req.user.dni;
+    const userDNI = req.user.dni;
     const pool = await connectDB();
 
     const result = await pool.request()
-      .input('receptorDNI', receptorDNI)
+      .input('userDNI', userDNI)
       .query(`
         SELECT 
           f.Id,
           f.TareaId,
-          f.EmisorDNI,
-          f.ReceptorDNI,
-          f.Comentario,
+          f.Emisor,
+          f.Mensaje,
           f.FechaCreacion,
           f.Leido,
           t.Titulo as TareaTitulo,
-          e.Nombre as EmisorNombre
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as EmisorNombre
         FROM Feedback f
         INNER JOIN Tareas t ON f.TareaId = t.Id
-        INNER JOIN PRI.Empleados e ON f.EmisorDNI = e.DNI
-        WHERE f.ReceptorDNI = @receptorDNI
+        LEFT JOIN PRI.Empleados e ON f.Emisor = e.DNI
+        WHERE t.Responsable = @userDNI
         ORDER BY f.FechaCreacion DESC
       `);
 
@@ -95,26 +98,26 @@ router.get('/received', authenticateToken, async (req, res) => {
 // GET - Obtener feedback enviado por el jefe supremo
 router.get('/sent', authenticateToken, isSupremeBoss, async (req, res) => {
   try {
-    const emisorDNI = req.user.dni;
+    const emisor = req.user.dni;
     const pool = await connectDB();
 
     const result = await pool.request()
-      .input('emisorDNI', emisorDNI)
+      .input('emisor', emisor)
       .query(`
         SELECT 
           f.Id,
           f.TareaId,
-          f.EmisorDNI,
-          f.ReceptorDNI,
-          f.Comentario,
+          f.Emisor,
+          f.Mensaje,
           f.FechaCreacion,
           f.Leido,
           t.Titulo as TareaTitulo,
-          e.Nombre as ReceptorNombre
+          t.Responsable as ReceptorDNI,
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as ReceptorNombre
         FROM Feedback f
         INNER JOIN Tareas t ON f.TareaId = t.Id
-        INNER JOIN PRI.Empleados e ON f.ReceptorDNI = e.DNI
-        WHERE f.EmisorDNI = @emisorDNI
+        LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+        WHERE f.Emisor = @emisor
         ORDER BY f.FechaCreacion DESC
       `);
 
@@ -130,16 +133,18 @@ router.get('/sent', authenticateToken, isSupremeBoss, async (req, res) => {
 router.put('/:id/read', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const receptorDNI = req.user.dni;
+    const userDNI = req.user.dni;
     const pool = await connectDB();
 
     const result = await pool.request()
       .input('id', id)
-      .input('receptorDNI', receptorDNI)
+      .input('userDNI', userDNI)
       .query(`
         UPDATE Feedback 
         SET Leido = 1 
-        WHERE Id = @id AND ReceptorDNI = @receptorDNI
+        WHERE Id = @id AND TareaId IN (
+          SELECT Id FROM Tareas WHERE Responsable = @userDNI
+        )
       `);
 
     if (result.rowsAffected[0] === 0) {
@@ -166,13 +171,13 @@ router.get('/:id/responses', authenticateToken, async (req, res) => {
         SELECT 
           rf.Id,
           rf.FeedbackId,
-          rf.EmisorDNI,
-          rf.Comentario,
+          rf.Emisor,
+          rf.Mensaje,
           rf.FechaCreacion,
           rf.Leido,
-          e.Nombre as EmisorNombre
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as EmisorNombre
         FROM RespuestasFeedback rf
-        INNER JOIN PRI.Empleados e ON rf.EmisorDNI = e.DNI
+        LEFT JOIN PRI.Empleados e ON rf.Emisor = e.DNI
         WHERE rf.FeedbackId = @feedbackId
         ORDER BY rf.FechaCreacion ASC
       `);
@@ -189,11 +194,11 @@ router.get('/:id/responses', authenticateToken, async (req, res) => {
 router.post('/:id/responses', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { comentario } = req.body;
-    const emisorDNI = req.user.dni;
+    const { mensaje } = req.body;
+    const emisor = req.user.dni;
 
-    if (!comentario) {
-      return res.status(400).json({ error: 'Comentario es requerido' });
+    if (!mensaje) {
+      return res.status(400).json({ error: 'Mensaje es requerido' });
     }
 
     const pool = await connectDB();
@@ -207,23 +212,37 @@ router.post('/:id/responses', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Feedback no encontrado' });
     }
 
-    // Crear respuesta
+    // Crear respuesta usando el esquema correcto
     const result = await pool.request()
       .input('feedbackId', id)
-      .input('emisorDNI', emisorDNI)
-      .input('comentario', comentario)
+      .input('emisor', emisor)
+      .input('mensaje', mensaje)
       .query(`
-        INSERT INTO RespuestasFeedback (FeedbackId, EmisorDNI, Comentario)
-        VALUES (@feedbackId, @emisorDNI, @comentario);
+        INSERT INTO RespuestasFeedback (FeedbackId, Emisor, Mensaje)
+        VALUES (@feedbackId, @emisor, @mensaje);
         SELECT SCOPE_IDENTITY() as Id;
       `);
 
     const respuestaId = result.recordset[0].Id;
 
-    res.status(201).json({
-      message: 'Respuesta creada exitosamente',
-      respuestaId
-    });
+    // Obtener la respuesta creada con el nombre del emisor
+    const respuestaCreada = await pool.request()
+      .input('respuestaId', respuestaId)
+      .query(`
+        SELECT 
+          rf.Id,
+          rf.FeedbackId,
+          rf.Emisor,
+          rf.Mensaje,
+          rf.FechaCreacion,
+          rf.Leido,
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as EmisorNombre
+        FROM RespuestasFeedback rf
+        LEFT JOIN PRI.Empleados e ON rf.Emisor = e.DNI
+        WHERE rf.Id = @respuestaId
+      `);
+
+    res.status(201).json(respuestaCreada.recordset[0]);
 
   } catch (error) {
     console.error('Error creando respuesta:', error);
@@ -238,7 +257,6 @@ router.get('/stats', authenticateToken, async (req, res) => {
     const userDNI = req.user.dni;
 
     let query = '';
-    let params = {};
 
     if (req.user.isSupremeBoss) {
       // Jefe supremo ve estadísticas de todos
@@ -256,10 +274,10 @@ router.get('/stats', authenticateToken, async (req, res) => {
           COUNT(*) as TotalFeedback,
           SUM(CASE WHEN Leido = 0 THEN 1 ELSE 0 END) as NoLeidos,
           SUM(CASE WHEN Leido = 1 THEN 1 ELSE 0 END) as Leidos
-        FROM Feedback
-        WHERE ReceptorDNI = @userDNI
+        FROM Feedback f
+        INNER JOIN Tareas t ON f.TareaId = t.Id
+        WHERE t.Responsable = @userDNI
       `;
-      params = { userDNI };
     }
 
     const result = await pool.request()

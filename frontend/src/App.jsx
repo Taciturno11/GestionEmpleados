@@ -19,8 +19,10 @@ function App() {
   const [activeTab, setActiveTab] = useState('tareas');
   const [showForm, setShowForm] = useState(false);
   const [editingTarea, setEditingTarea] = useState(null);
+  const [editingField, setEditingField] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [stats, setStats] = useState({});
+  const [reporteEmpleados, setReporteEmpleados] = useState([]);
   const [nuevaTarea, setNuevaTarea] = useState({
     titulo: '',
     responsable: '',
@@ -37,6 +39,24 @@ function App() {
   const [nuevoMensaje, setNuevoMensaje] = useState('');
   const [cargandoMensajes, setCargandoMensajes] = useState({});
   const chatEndRef = useRef(null);
+
+  // Inicializar usuario desde localStorage
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    
+    if (savedToken && savedUser) {
+      try {
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
+        setToken(savedToken);
+      } catch (error) {
+        console.error('Error parsing saved user data:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
 
   // Configurar interceptores de axios
   useEffect(() => {
@@ -82,7 +102,8 @@ function App() {
       await Promise.all([
         cargarTareas(),
         cargarUsuarios(),
-        cargarStats()
+        cargarStats(),
+        cargarReporteEmpleados()
       ]);
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -115,6 +136,17 @@ function App() {
       setStats(response.data);
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
+    }
+  };
+
+  const cargarReporteEmpleados = async () => {
+    try {
+      if (user?.isSupremeBoss) {
+        const response = await api.get('/tareas/reporte-empleados');
+        setReporteEmpleados(response.data);
+      }
+    } catch (error) {
+      console.error('Error cargando reporte de empleados:', error);
     }
   };
 
@@ -152,19 +184,67 @@ function App() {
         observaciones: ''
       });
       setShowForm(false);
-      cargarTareas();
+      // Actualizar tanto las tareas como las estadísticas
+      await Promise.all([
+        cargarTareas(),
+        cargarStats()
+      ]);
     } catch (error) {
       console.error('Error creando tarea:', error);
     }
   };
 
-  const actualizarTarea = async (id, datos) => {
+  const iniciarEdicionInline = (tareaId, field) => {
+    setEditingTarea(tareaId);
+    setEditingField(field);
+  };
+
+  const cancelarEdicionInline = () => {
+    setEditingTarea(null);
+    setEditingField(null);
+  };
+
+  const activarModoEdicion = (tareaId) => {
+    setEditingTarea(tareaId);
+    setEditingField('modoEdicion'); // Activar modo edición completo
+  };
+
+  const actualizarCampo = async (tareaId, field, newValue) => {
     try {
-      await api.put(`/tareas/${id}`, datos);
-      cargarTareas();
-      setEditingTarea(null);
+      // Obtener la tarea actual
+      const tareaActual = tareas.find(t => t.Id === tareaId);
+      if (!tareaActual) return;
+
+      // Preparar los datos de actualización
+      const datosActualizacion = {
+        titulo: tareaActual.Titulo,
+        responsable: tareaActual.Responsable,
+        fechaInicio: tareaActual.FechaInicio ? tareaActual.FechaInicio.split('T')[0] : '',
+        fechaFin: tareaActual.FechaFin ? tareaActual.FechaFin.split('T')[0] : '',
+        prioridad: tareaActual.Prioridad,
+        estado: tareaActual.Estado,
+        observaciones: tareaActual.Observaciones || ''
+      };
+
+      // Actualizar el campo específico
+      datosActualizacion[field] = newValue;
+
+      // Si no es jefe supremo, no puede cambiar responsable ni observaciones
+      if (!user.isSupremeBoss) {
+        datosActualizacion.responsable = tareaActual.Responsable;
+        datosActualizacion.observaciones = '';
+      }
+
+      await api.put(`/tareas/${tareaId}`, datosActualizacion);
+      // Actualizar tanto las tareas como las estadísticas
+      await Promise.all([
+        cargarTareas(),
+        cargarStats()
+      ]);
+      cancelarEdicionInline();
     } catch (error) {
-      console.error('Error actualizando tarea:', error);
+      console.error('Error actualizando campo:', error);
+      cancelarEdicionInline();
     }
   };
 
@@ -173,7 +253,11 @@ function App() {
     
     try {
       await api.delete(`/tareas/${id}`);
-      cargarTareas();
+      // Actualizar tanto las tareas como las estadísticas
+      await Promise.all([
+        cargarTareas(),
+        cargarStats()
+      ]);
     } catch (error) {
       console.error('Error eliminando tarea:', error);
     }
@@ -309,7 +393,7 @@ function App() {
               />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Partner Design Thinking</h1>
-                <p className="text-gray-600 text-sm">Panel de Administración - Carlos Manuel Paucar Serra</p>
+                <p className="text-gray-600 text-sm">Panel de Administración - {user?.nombre || 'Usuario'}</p>
               </div>
             </div>
             <button 
@@ -353,7 +437,12 @@ function App() {
               👥 Usuarios
             </button>
             <button 
-              className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                activeTab === 'reporte' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              onClick={() => setActiveTab('reporte')}
             >
               📊 Reporte de Empleados
             </button>
@@ -558,9 +647,11 @@ function App() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Estado
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Observaciones
-                      </th>
+                      {!editingTarea && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Observaciones
+                        </th>
+                      )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                         Acciones
                       </th>
@@ -569,14 +660,14 @@ function App() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
                       <tr>
-                        <td colSpan="8" className="px-6 py-4 text-center">
+                        <td colSpan={editingTarea ? "7" : "8"} className="px-6 py-4 text-center">
                           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                           <p className="mt-2 text-gray-600">Cargando tareas...</p>
                         </td>
                       </tr>
                     ) : tareas.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="px-6 py-4 text-center">
+                        <td colSpan={editingTarea ? "7" : "8"} className="px-6 py-4 text-center">
                           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                           </svg>
@@ -586,63 +677,169 @@ function App() {
                       </tr>
                     ) : (
                       tareas.map((tarea) => (
-                        <tr key={tarea.Id} className="hover:bg-gray-50">
+                        <tr key={tarea.Id} className={`hover:bg-gray-50 ${editingTarea === tarea.Id ? 'bg-blue-50 border-l-4 border-blue-400' : ''}`}>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{tarea.Titulo}</div>
+                            {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
+                              <input
+                                type="text"
+                                defaultValue={tarea.Titulo}
+                                className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onBlur={(e) => actualizarCampo(tarea.Id, 'titulo', e.target.value)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    actualizarCampo(tarea.Id, 'titulo', e.target.value);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="text-sm font-medium text-gray-900 px-2 py-1 rounded">
+                                {tarea.Titulo}
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatDate(tarea.FechaInicio)}
+                            {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
+                              <input
+                                type="date"
+                                defaultValue={tarea.FechaInicio ? tarea.FechaInicio.split('T')[0] : ''}
+                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onBlur={(e) => actualizarCampo(tarea.Id, 'fechaInicio', e.target.value)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    actualizarCampo(tarea.Id, 'fechaInicio', e.target.value);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="px-2 py-1 rounded">
+                                {formatDate(tarea.FechaInicio)}
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatDate(tarea.FechaFin)}
+                            {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
+                              <input
+                                type="date"
+                                defaultValue={tarea.FechaFin ? tarea.FechaFin.split('T')[0] : ''}
+                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onBlur={(e) => actualizarCampo(tarea.Id, 'fechaFin', e.target.value)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    actualizarCampo(tarea.Id, 'fechaFin', e.target.value);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="px-2 py-1 rounded">
+                                {formatDate(tarea.FechaFin)}
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getPriorityColor(tarea.Prioridad)}`}>
-                              {tarea.Prioridad}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {tarea.NombreResponsable || tarea.Responsable}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(tarea.Estado)}`}>
-                              {tarea.Estado}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="relative">
-                              <button
-                                onClick={() => abrirChat(tarea.Id)}
-                                className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
-                                title="Ver observaciones"
+                            {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
+                              <select
+                                defaultValue={tarea.Prioridad}
+                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onBlur={(e) => actualizarCampo(tarea.Id, 'prioridad', e.target.value)}
+                                onChange={(e) => actualizarCampo(tarea.Id, 'prioridad', e.target.value)}
                               >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                </svg>
-                                {tarea.MensajesNoLeidos > 0 && (
-                                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold min-w-[24px]">
-                                    {tarea.MensajesNoLeidos}
-                                  </span>
-                                )}
-                              </button>
-                            </div>
+                                <option value="Alta">Alta</option>
+                                <option value="Media">Media</option>
+                                <option value="Baja">Baja</option>
+                              </select>
+                            ) : (
+                              <span 
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getPriorityColor(tarea.Prioridad)}`}
+                              >
+                                {tarea.Prioridad}
+                              </span>
+                            )}
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {user.isSupremeBoss && editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
+                              <select
+                                defaultValue={tarea.Responsable}
+                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onBlur={(e) => actualizarCampo(tarea.Id, 'responsable', e.target.value)}
+                                onChange={(e) => actualizarCampo(tarea.Id, 'responsable', e.target.value)}
+                              >
+                                {usuarios.map(usuario => (
+                                  <option key={usuario.DNI} value={usuario.DNI}>
+                                    {usuario.Nombres} {usuario.ApellidoPaterno}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <div className="px-2 py-1 rounded">
+                                {tarea.NombreResponsable || tarea.Responsable}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
+                              <select
+                                defaultValue={tarea.Estado}
+                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onBlur={(e) => actualizarCampo(tarea.Id, 'estado', e.target.value)}
+                                onChange={(e) => actualizarCampo(tarea.Id, 'estado', e.target.value)}
+                              >
+                                <option value="Pendiente">Pendiente</option>
+                                <option value="En Progreso">En Progreso</option>
+                                <option value="Terminado">Terminado</option>
+                              </select>
+                            ) : (
+                              <span 
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(tarea.Estado)}`}
+                              >
+                                {tarea.Estado}
+                              </span>
+                            )}
+                          </td>
+                          {!editingTarea && (
+                            <td className="px-6 py-4">
+                              <div className="relative">
+                                {/* Solo mostrar botón de chat si hay mensajes del jefe supremo o si es el jefe supremo */}
+                                {(tarea.TotalMensajes > 0 || user.isSupremeBoss) && (
+                                  <button
+                                    onClick={() => abrirChat(tarea.Id)}
+                                    className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
+                                    title={user.isSupremeBoss ? "Ver observaciones" : "Responder a observación del jefe"}
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    {tarea.MensajesNoLeidos > 0 && (
+                                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold min-w-[24px]">
+                                        {tarea.MensajesNoLeidos}
+                                      </span>
+                                    )}
+                                  </button>
+                                )}
+                                {/* Mostrar mensaje informativo para trabajadores cuando no hay observaciones del jefe */}
+                                {!user.isSupremeBoss && tarea.TotalMensajes === 0 && (
+                                  <div className="text-gray-400 text-xs text-center px-2 py-1" title="Esperando observación del jefe">
+                                    ⏳
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium pl-0 pr-2">
                             <div className="flex space-x-1 justify-start">
                               <button 
-                                className="text-blue-600 hover:text-blue-900 px-1 py-1"
-                                onClick={() => setEditingTarea(tarea.Id)}
+                                className={`px-1 py-1 ${editingTarea === tarea.Id ? 'text-green-600 hover:text-green-900' : 'text-blue-600 hover:text-blue-900'}`}
+                                onClick={() => editingTarea === tarea.Id ? cancelarEdicionInline() : activarModoEdicion(tarea.Id)}
+                                title={editingTarea === tarea.Id ? "Haz clic para cancelar edición" : "Haz clic para editar"}
                               >
-                                ✏️ Editar
+                                {editingTarea === tarea.Id ? '✅ Listo' : '✏️ Editar'}
                               </button>
-                              {user.isSupremeBoss && (
-                                <button 
-                                  className="text-red-600 hover:text-red-900 px-1 py-1"
-                                  onClick={() => eliminarTarea(tarea.Id)}
-                                >
-                                  🗑️ Eliminar
-                                </button>
-                              )}
+                              <button 
+                                className="text-red-600 hover:text-red-900 px-1 py-1"
+                                onClick={() => eliminarTarea(tarea.Id)}
+                                title="Eliminar tarea"
+                              >
+                                🗑️ Eliminar
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -652,6 +849,7 @@ function App() {
                 </table>
               </div>
             </div>
+
 
             {/* Chat Popover */}
             {chatAbierto && (
@@ -698,6 +896,11 @@ function App() {
                           >
                             <div className="text-xs opacity-75 mb-1">
                               {mensaje.NombreEmisor || mensaje.Emisor}
+                              {mensaje.NombreReceptor && (
+                                <span className="ml-2 text-gray-400">
+                                  → {mensaje.NombreReceptor}
+                                </span>
+                              )}
                             </div>
                             <div className="text-sm">{mensaje.Mensaje}</div>
                             <div className="text-xs opacity-75 mt-1">
@@ -743,6 +946,68 @@ function App() {
         )}
 
         {activeTab === 'feedback' && <Feedback />}
+
+        {activeTab === 'reporte' && (
+          <div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">📊 Reporte de Empleados con Tareas Pendientes</h2>
+              
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <p className="mt-4 text-gray-600">Cargando reporte...</p>
+                </div>
+              ) : reporteEmpleados.length === 0 ? (
+                <div className="text-center py-12">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">¡Excelente!</h3>
+                  <p className="mt-1 text-sm text-gray-500">No hay empleados con tareas pendientes.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {reporteEmpleados.map((empleado) => (
+                    <div key={empleado.DNI} className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{empleado.Nombre}</h3>
+                          <p className="text-sm text-gray-600">DNI: {empleado.DNI} • {empleado.Rol}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-red-600">{empleado.TareasPendientes}</div>
+                          <div className="text-sm text-gray-600">Tareas Pendientes</div>
+                        </div>
+                      </div>
+                      
+                      {empleado.Tareas && empleado.Tareas.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-3">Tareas Pendientes:</h4>
+                          <div className="space-y-2">
+                            {empleado.Tareas.map((tarea, index) => (
+                              <div key={index} className="bg-white rounded-md p-3 border border-gray-200">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">{tarea.Titulo}</p>
+                                    <p className="text-xs text-gray-500">ID: {tarea.Id}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs text-gray-500">Fecha límite:</p>
+                                    <p className="text-sm font-medium text-gray-900">{formatDate(tarea.FechaFin)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

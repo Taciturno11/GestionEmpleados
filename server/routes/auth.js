@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { connectDB } = require('../config/database');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, authenticateToken, isSupremeBoss } = require('../middleware/auth');
 
 // POST - Login
 router.post('/login', async (req, res) => {
@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
       .query(`
         SELECT DNI, Nombres, ApellidoPaterno, ApellidoMaterno, CargoID 
         FROM PRI.Empleados 
-        WHERE DNI = @dni AND CargoID IN (4, 8)
+        WHERE DNI = @dni AND (CargoID IN (4, 8) OR DNI IN ('44991089', '73766815'))
       `);
 
     if (result.recordset.length === 0) {
@@ -45,7 +45,7 @@ router.post('/login', async (req, res) => {
         dni: user.DNI, 
         nombre: nombreCompleto, 
         cargoId: user.CargoID,
-        isSupremeBoss: user.DNI === '44991089'
+        isSupremeBoss: user.DNI === '44991089' || user.DNI === '73766815'
       }, 
       JWT_SECRET, 
       { expiresIn: '24h' }
@@ -58,7 +58,7 @@ router.post('/login', async (req, res) => {
         dni: user.DNI,
         nombre: nombreCompleto,
         cargoId: user.CargoID,
-        isSupremeBoss: user.DNI === '44991089'
+        isSupremeBoss: user.DNI === '44991089' || user.DNI === '73766815'
       }
     });
 
@@ -69,7 +69,7 @@ router.post('/login', async (req, res) => {
 });
 
 // GET - Verificar token y obtener información del usuario
-router.get('/me', async (req, res) => {
+router.get('/me', authenticateToken, async (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -91,7 +91,7 @@ router.get('/me', async (req, res) => {
         .query(`
           SELECT DNI, Nombres, ApellidoPaterno, ApellidoMaterno, CargoID 
           FROM PRI.Empleados 
-          WHERE DNI = @dni AND CargoID IN (4, 8)
+          WHERE DNI = @dni AND (CargoID IN (4, 8) OR DNI IN ('44991089', '73766815'))
         `);
 
       if (result.recordset.length === 0) {
@@ -108,7 +108,7 @@ router.get('/me', async (req, res) => {
           dni: user.DNI,
           nombre: nombreCompleto,
           cargoId: user.CargoID,
-          isSupremeBoss: user.DNI === '44991089'
+          isSupremeBoss: user.DNI === '44991089' || user.DNI === '73766815'
         }
       });
     });
@@ -120,7 +120,7 @@ router.get('/me', async (req, res) => {
 });
 
 // GET - Obtener lista de usuarios (solo jefe supremo)
-router.get('/users', async (req, res) => {
+router.get('/users', authenticateToken, isSupremeBoss, async (req, res) => {
   try {
     const pool = await connectDB();
     
@@ -134,7 +134,7 @@ router.get('/users', async (req, res) => {
                  ELSE 'Otro'
                END as Rol
         FROM PRI.Empleados 
-        WHERE CargoID IN (4, 8) AND EstadoEmpleado = 'Activo'
+        WHERE (CargoID IN (4, 8) OR DNI = '44991089') AND EstadoEmpleado = 'Activo'
         ORDER BY CargoID DESC, Nombres ASC
       `);
 

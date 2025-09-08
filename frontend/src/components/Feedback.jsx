@@ -7,11 +7,12 @@ function Feedback() {
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newFeedback, setNewFeedback] = useState({
-    destinatario: '',
-    mensaje: '',
-    prioridad: 'Normal'
+    tareaId: '',
+    mensaje: ''
   });
   const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     cargarFeedbacks();
@@ -19,13 +20,15 @@ function Feedback() {
 
   const cargarFeedbacks = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(API_URL, {
+      const response = await axios.get(`${API_URL}/received`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setFeedbacks(response.data);
     } catch (error) {
       console.error('Error cargando feedbacks:', error);
+      setError('Error al cargar los feedbacks');
     } finally {
       setLoading(false);
     }
@@ -33,26 +36,27 @@ function Feedback() {
 
   const enviarFeedback = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+    
     try {
       const token = localStorage.getItem('token');
-      await axios.post(API_URL, newFeedback, {
+      const response = await axios.post(API_URL, newFeedback, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setNewFeedback({ destinatario: '', mensaje: '', prioridad: 'Normal' });
+      
+      setSuccess('Feedback enviado exitosamente');
+      setNewFeedback({ tareaId: '', mensaje: '' });
       setShowForm(false);
       cargarFeedbacks();
     } catch (error) {
       console.error('Error enviando feedback:', error);
+      setError(error.response?.data?.error || 'Error al enviar el feedback');
     }
   };
 
-  const getPriorityColor = (prioridad) => {
-    switch (prioridad) {
-      case 'Alta': return 'bg-red-100 text-red-800';
-      case 'Normal': return 'bg-yellow-100 text-yellow-800';
-      case 'Baja': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const getStatusColor = (leido) => {
+    return leido ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
   };
 
   const formatDate = (dateString) => {
@@ -93,34 +97,48 @@ function Feedback() {
         {showForm && (
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <form onSubmit={enviarFeedback} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Destinatario
-                  </label>
-                  <input
-                    type="text"
-                    value={newFeedback.destinatario}
-                    onChange={(e) => setNewFeedback({...newFeedback, destinatario: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    placeholder="Nombre del destinatario"
-                    required
-                  />
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-600">{error}</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Prioridad
-                  </label>
-                  <select
-                    value={newFeedback.prioridad}
-                    onChange={(e) => setNewFeedback({...newFeedback, prioridad: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  >
-                    <option value="Baja">Baja</option>
-                    <option value="Normal">Normal</option>
-                    <option value="Alta">Alta</option>
-                  </select>
+              )}
+
+              {success && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-green-600">{success}</p>
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ID de Tarea
+                </label>
+                <input
+                  type="number"
+                  value={newFeedback.tareaId}
+                  onChange={(e) => setNewFeedback({...newFeedback, tareaId: e.target.value})}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="ID de la tarea"
+                  required
+                />
               </div>
               
               <div>
@@ -140,7 +158,11 @@ function Feedback() {
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={() => {
+                    setShowForm(false);
+                    setError('');
+                    setSuccess('');
+                  }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200 font-medium"
                 >
                   Cancelar
@@ -171,28 +193,32 @@ function Feedback() {
                 <div key={feedback.Id} className="bg-gray-50 rounded-lg p-6 border border-gray-200 hover:shadow-md transition-shadow duration-200">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">{feedback.Destinatario}</h3>
-                      <p className="text-gray-700 leading-relaxed">{feedback.Mensaje}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">Tarea: {feedback.TareaTitulo}</h3>
+                        <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                          ID: {feedback.TareaId}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 leading-relaxed mb-3">{feedback.Mensaje}</p>
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          De: {feedback.EmisorNombre || feedback.Emisor}
+                        </div>
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {formatDate(feedback.FechaCreacion)}
+                        </div>
+                      </div>
                     </div>
                     <div className="ml-4">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getPriorityColor(feedback.Prioridad)}`}>
-                        {feedback.Prioridad}
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(feedback.Leido)}`}>
+                        {feedback.Leido ? 'Leído' : 'No leído'}
                       </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {formatDate(feedback.FechaCreacion)}
-                    </div>
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      {feedback.Emisor}
                     </div>
                   </div>
                 </div>

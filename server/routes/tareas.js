@@ -73,7 +73,7 @@ router.get('/reporte-empleados', authenticateToken, isSupremeBoss, async (req, r
           ) WITHIN GROUP (ORDER BY t.FechaFin) as TareasJSON
         FROM PRI.Empleados e
         LEFT JOIN Tareas t ON e.DNI = t.Responsable AND t.Estado = 'Pendiente'
-        WHERE e.CargoID IN (4, 8) AND e.EstadoEmpleado = 'Activo'
+        WHERE (e.CargoID IN (4, 8) OR e.DNI = '44991089') AND e.EstadoEmpleado = 'Activo'
         GROUP BY e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID
         HAVING COUNT(t.Id) > 0
         ORDER BY TareasPendientes DESC, e.Nombres ASC
@@ -325,18 +325,31 @@ router.put('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE - Eliminar tarea (solo jefe supremo)
-router.delete('/:id', authenticateToken, isSupremeBoss, async (req, res) => {
+// DELETE - Eliminar tarea
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const pool = await connectDB();
     
+    let query = '';
+    let params = { id };
+
+    if (req.user.isSupremeBoss) {
+      // Jefe supremo puede eliminar cualquier tarea
+      query = 'DELETE FROM Tareas WHERE Id = @id';
+    } else {
+      // Usuario regular solo puede eliminar sus propias tareas
+      query = 'DELETE FROM Tareas WHERE Id = @id AND Responsable = @userDNI';
+      params = { id, userDNI: req.user.dni };
+    }
+    
     const result = await pool.request()
       .input('id', id)
-      .query('DELETE FROM Tareas WHERE Id = @id');
+      .input('userDNI', req.user.dni)
+      .query(query);
 
     if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({ error: 'Tarea no encontrada' });
+      return res.status(404).json({ error: 'Tarea no encontrada o sin permisos para eliminar' });
     }
 
     res.json({ message: 'Tarea eliminada exitosamente' });
@@ -359,7 +372,17 @@ router.get('/:id/mensajes', authenticateToken, async (req, res) => {
     if (req.user.isSupremeBoss) {
       query = 'SELECT * FROM Tareas WHERE Id = @id';
     } else {
-      query = 'SELECT * FROM Tareas WHERE Id = @id AND Responsable = @userDNI';
+      // Los trabajadores pueden ver sus tareas Y tareas donde el jefe supremo ha hecho observaciones
+      query = `
+        SELECT t.* FROM Tareas t
+        WHERE t.Id = @id AND (
+          t.Responsable = @userDNI OR 
+          EXISTS (
+            SELECT 1 FROM MensajesObservaciones m 
+            WHERE m.TareaId = t.Id AND m.Emisor = '44991089'
+          )
+        )
+      `;
     }
     
     const tareaResult = await pool.request()
@@ -377,21 +400,41 @@ router.get('/:id/mensajes', authenticateToken, async (req, res) => {
     // Obtener los mensajes del chat
     const mensajesResult = await pool.request()
       .input('tareaId', id)
-             .query(`
+      .query(`
          SELECT 
            m.Id,
            m.TareaId,
            m.Emisor,
+           m.Receptor,
            m.Mensaje,
            m.FechaCreacion,
-           LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as NombreEmisor
+           e.Nombres,
+           e.ApellidoPaterno,
+           e.ApellidoMaterno,
+           CASE 
+             WHEN e.Nombres IS NOT NULL THEN 
+               LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '')
+             ELSE 
+               m.Emisor
+           END as NombreEmisor,
+           r.Nombres as ReceptorNombres,
+           r.ApellidoPaterno as ReceptorApellidoPaterno,
+           r.ApellidoMaterno as ReceptorApellidoMaterno,
+           CASE 
+             WHEN r.Nombres IS NOT NULL THEN 
+               LEFT(r.Nombres, CHARINDEX(' ', r.Nombres + ' ') - 1) + ' ' + r.ApellidoPaterno + ' ' + ISNULL(r.ApellidoMaterno, '')
+             ELSE 
+               m.Receptor
+           END as NombreReceptor
          FROM MensajesObservaciones m
          LEFT JOIN PRI.Empleados e ON m.Emisor = e.DNI
+         LEFT JOIN PRI.Empleados r ON m.Receptor = r.DNI
          WHERE m.TareaId = @tareaId
          ORDER BY m.FechaCreacion ASC
        `);
     
     console.log('✅ Mensajes obtenidos:', mensajesResult.recordset.length, 'mensajes');
+    console.log('🔍 Todos los mensajes:', JSON.stringify(mensajesResult.recordset, null, 2));
     res.json(mensajesResult.recordset);
   } catch (error) {
     console.error('❌ Error obteniendo mensajes:', error);
@@ -465,7 +508,12 @@ router.post('/:id/mensajes', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { mensaje } = req.body;
     
-    console.log('📨 Enviando mensaje:', { id, mensaje, user: req.user.dni });
+    console.log('📨 Enviando mensaje:', { id, mensaje, user: req.user.dni, isSupremeBoss: req.user.isSupremeBoss });
+    
+    // Solo el Jefe Supremo puede enviar mensajes
+    if (!req.user.isSupremeBoss) {
+      return res.status(403).json({ error: 'Solo el Jefe Supremo puede enviar observaciones' });
+    }
     
     if (!mensaje || !mensaje.trim()) {
       return res.status(400).json({ error: 'El mensaje es requerido' });
@@ -473,17 +521,11 @@ router.post('/:id/mensajes', authenticateToken, async (req, res) => {
     
     const pool = await connectDB();
     
-    // Verificar que el usuario puede ver esta tarea
-    let query = '';
-    if (req.user.isSupremeBoss) {
-      query = 'SELECT * FROM Tareas WHERE Id = @id';
-    } else {
-      query = 'SELECT * FROM Tareas WHERE Id = @id AND Responsable = @userDNI';
-    }
+    // Verificar que la tarea existe (solo Jefe Supremo puede enviar mensajes)
+    const query = 'SELECT * FROM Tareas WHERE Id = @id';
     
     const tareaResult = await pool.request()
       .input('id', id)
-      .input('userDNI', req.user.dni)
       .query(query);
     
     if (tareaResult.recordset.length === 0) {
@@ -493,21 +535,28 @@ router.post('/:id/mensajes', authenticateToken, async (req, res) => {
     
     console.log('✅ Tarea encontrada, procediendo a insertar mensaje');
     
-    // Insertar el mensaje
+    // Obtener el responsable de la tarea para usarlo como receptor
+    const tarea = tareaResult.recordset[0];
+    const receptor = tarea.Responsable;
+    
+    // Insertar el mensaje con receptor
+    console.log('🔍 Insertando mensaje con emisor:', req.user.dni, 'y receptor:', receptor);
     const result = await pool.request()
       .input('tareaId', id)
       .input('emisor', req.user.dni)
+      .input('receptor', receptor)
       .input('mensaje', mensaje.trim())
       .query(`
-        INSERT INTO MensajesObservaciones (TareaId, Emisor, Mensaje)
-        VALUES (@tareaId, @emisor, @mensaje);
+        INSERT INTO MensajesObservaciones (TareaId, Emisor, Receptor, Mensaje)
+        VALUES (@tareaId, @emisor, @receptor, @mensaje);
         SELECT SCOPE_IDENTITY() as Id;
       `);
     
     const mensajeId = result.recordset[0].Id;
     console.log('✅ Mensaje insertado con ID:', mensajeId);
     
-         // Obtener el mensaje recién creado con el nombre del emisor
+         // Obtener el mensaje recién creado con el nombre del emisor y receptor
+     console.log('🔍 Obteniendo mensaje creado con ID:', mensajeId);
      const mensajeCreado = await pool.request()
        .input('mensajeId', mensajeId)
        .query(`
@@ -515,15 +564,35 @@ router.post('/:id/mensajes', authenticateToken, async (req, res) => {
            m.Id,
            m.TareaId,
            m.Emisor,
+           m.Receptor,
            m.Mensaje,
            m.FechaCreacion,
-           LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno as NombreEmisor
+           e.Nombres,
+           e.ApellidoPaterno,
+           e.ApellidoMaterno,
+           e.DNI as EmpleadoDNI,
+           CASE 
+             WHEN e.Nombres IS NOT NULL THEN 
+               LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '')
+             ELSE 
+               m.Emisor
+           END as NombreEmisor,
+           r.Nombres as ReceptorNombres,
+           r.ApellidoPaterno as ReceptorApellidoPaterno,
+           r.ApellidoMaterno as ReceptorApellidoMaterno,
+           CASE 
+             WHEN r.Nombres IS NOT NULL THEN 
+               LEFT(r.Nombres, CHARINDEX(' ', r.Nombres + ' ') - 1) + ' ' + r.ApellidoPaterno + ' ' + ISNULL(r.ApellidoMaterno, '')
+             ELSE 
+               m.Receptor
+           END as NombreReceptor
          FROM MensajesObservaciones m
          LEFT JOIN PRI.Empleados e ON m.Emisor = e.DNI
+         LEFT JOIN PRI.Empleados r ON m.Receptor = r.DNI
          WHERE m.Id = @mensajeId
        `);
     
-    console.log('✅ Mensaje creado:', mensajeCreado.recordset[0]);
+    console.log('✅ Mensaje creado:', JSON.stringify(mensajeCreado.recordset[0], null, 2));
     res.status(201).json(mensajeCreado.recordset[0]);
   } catch (error) {
     console.error('❌ Error enviando mensaje:', error);
