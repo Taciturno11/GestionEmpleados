@@ -22,7 +22,6 @@ function App() {
   const [editingField, setEditingField] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [stats, setStats] = useState({});
-  const [reporteEmpleados, setReporteEmpleados] = useState([]);
   const [nuevaTarea, setNuevaTarea] = useState({
     titulo: '',
     responsable: '',
@@ -60,10 +59,21 @@ function App() {
 
   // Configurar interceptores de axios
   useEffect(() => {
+    // Limpiar interceptores anteriores
+    api.interceptors.request.clear();
+    
     api.interceptors.request.use(
       (config) => {
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+        // Obtener el token actual del localStorage en cada request
+        const currentToken = localStorage.getItem('token');
+        if (currentToken) {
+          config.headers.Authorization = `Bearer ${currentToken}`;
+          console.log('🔍 FRONTEND - Enviando token:', {
+            url: config.url,
+            token: currentToken.substring(0, 20) + '...',
+            usuario: user?.dni,
+            tokenFromState: token ? token.substring(0, 20) + '...' : 'null'
+          });
         }
         return config;
       },
@@ -102,8 +112,7 @@ function App() {
       await Promise.all([
         cargarTareas(),
         cargarUsuarios(),
-        cargarStats(),
-        cargarReporteEmpleados()
+        cargarStats()
       ]);
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -139,30 +148,49 @@ function App() {
     }
   };
 
-  const cargarReporteEmpleados = async () => {
-    try {
-      if (user?.isSupremeBoss) {
-        const response = await api.get('/tareas/reporte-empleados');
-        setReporteEmpleados(response.data);
-      }
-    } catch (error) {
-      console.error('Error cargando reporte de empleados:', error);
-    }
-  };
-
   const handleLogin = (userData, userToken) => {
+    console.log('🔍 FRONTEND - handleLogin llamado:', {
+      nuevoUsuario: userData.dni,
+      nuevoNombre: userData.nombre,
+      nuevoToken: userToken.substring(0, 20) + '...',
+      tokenAnterior: token ? token.substring(0, 20) + '...' : 'null'
+    });
+    
+    // Limpiar estado anterior antes de establecer nuevo usuario
+    setTareas([]);
+    setChatAbierto(null);
+    setMensajes({});
+    setNuevoMensaje('');
+    setActiveTab('tareas');
+    setShowForm(false);
+    setEditingTarea(null);
+    setEditingField(null);
+    setStats({});
+    
+    // Establecer nuevo usuario
     setUser(userData);
     setToken(userToken);
   };
 
   const handleLogout = () => {
+    console.log('🧹 FRONTEND - Cerrando sesión, limpiando todo el estado');
+    
+    // Limpiar localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Limpiar estado de React
     setUser(null);
     setToken(null);
     setTareas([]);
     setChatAbierto(null);
     setMensajes({});
+    setNuevoMensaje('');
+    setActiveTab('tareas');
+    setShowForm(false);
+    setEditingTarea(null);
+    setEditingField(null);
+    setStats({});
   };
 
   const crearTarea = async (e) => {
@@ -184,7 +212,6 @@ function App() {
         observaciones: ''
       });
       setShowForm(false);
-      // Actualizar tanto las tareas como las estadísticas
       await Promise.all([
         cargarTareas(),
         cargarStats()
@@ -206,16 +233,14 @@ function App() {
 
   const activarModoEdicion = (tareaId) => {
     setEditingTarea(tareaId);
-    setEditingField('modoEdicion'); // Activar modo edición completo
+    setEditingField('modoEdicion');
   };
 
   const actualizarCampo = async (tareaId, field, newValue) => {
     try {
-      // Obtener la tarea actual
       const tareaActual = tareas.find(t => t.Id === tareaId);
       if (!tareaActual) return;
 
-      // Preparar los datos de actualización
       const datosActualizacion = {
         titulo: tareaActual.Titulo,
         responsable: tareaActual.Responsable,
@@ -226,17 +251,14 @@ function App() {
         observaciones: tareaActual.Observaciones || ''
       };
 
-      // Actualizar el campo específico
       datosActualizacion[field] = newValue;
 
-      // Si no es jefe supremo, no puede cambiar responsable ni observaciones
       if (!user.isSupremeBoss) {
         datosActualizacion.responsable = tareaActual.Responsable;
         datosActualizacion.observaciones = '';
       }
 
       await api.put(`/tareas/${tareaId}`, datosActualizacion);
-      // Actualizar tanto las tareas como las estadísticas
       await Promise.all([
         cargarTareas(),
         cargarStats()
@@ -253,7 +275,6 @@ function App() {
     
     try {
       await api.delete(`/tareas/${id}`);
-      // Actualizar tanto las tareas como las estadísticas
       await Promise.all([
         cargarTareas(),
         cargarStats()
@@ -269,12 +290,10 @@ function App() {
     if (!mensajes[tareaId]) {
       await cargarMensajes(tareaId);
     }
-    // Marcar mensajes como leídos solo si no es el Jefe Supremo
-    if (!user.isSupremeBoss) {
-      await marcarMensajesComoLeidos(tareaId);
-    }
     
-    // Auto-scroll después de cargar los mensajes
+    // Marcar mensajes como leídos para ambos tipos de usuario
+    await marcarMensajesComoLeidos(tareaId);
+    
     setTimeout(() => {
       if (chatEndRef.current) {
         chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -300,12 +319,12 @@ function App() {
 
   const marcarMensajesComoLeidos = async (tareaId) => {
     try {
+      console.log('📖 FRONTEND - Marcando mensajes como leídos para tarea:', tareaId);
       const response = await api.put(`/tareas/${tareaId}/mensajes/leer`);
-      console.log('✅ Mensajes marcados como leídos:', response.data);
-      // Actualizar contador en las tareas
+      console.log('✅ FRONTEND - Mensajes marcados como leídos:', response.data);
       await cargarTareas();
     } catch (error) {
-      console.error('Error marcando mensajes como leídos:', error);
+      console.error('❌ FRONTEND - Error marcando mensajes como leídos:', error);
     }
   };
 
@@ -313,20 +332,20 @@ function App() {
     e.preventDefault();
     if (!nuevoMensaje.trim() || !chatAbierto) return;
 
-    // Verificar si el usuario puede enviar mensajes
-    if (!user.isSupremeBoss) {
-      // Los trabajadores solo pueden responder si el jefe supremo ya escribió algo
-      const mensajesJefe = mensajes[chatAbierto]?.filter(m => m.Emisor === '44991089');
-      if (!mensajesJefe || mensajesJefe.length === 0) {
-        alert('Solo puedes responder después de que el jefe supremo haya enviado una observación');
-        return;
-      }
-    }
+    console.log('🔍 FRONTEND - Enviando mensaje:', {
+      usuario: user?.dni,
+      nombre: user?.nombre,
+      isSupremeBoss: user?.isSupremeBoss,
+      mensaje: nuevoMensaje.trim(),
+      tareaId: chatAbierto
+    });
 
     try {
       const response = await api.post(`/tareas/${chatAbierto}/mensajes`, {
         mensaje: nuevoMensaje.trim()
       });
+      
+      console.log('✅ FRONTEND - Mensaje enviado exitosamente:', response.data);
       
       setMensajes(prev => ({
         ...prev,
@@ -334,10 +353,12 @@ function App() {
       }));
       
       setNuevoMensaje('');
-      // Actualizar contador en las tareas
       cargarTareas();
     } catch (error) {
       console.error('Error enviando mensaje:', error);
+      if (error.response?.data?.error) {
+        alert(error.response.data.error);
+      }
     }
   };
 
@@ -357,7 +378,8 @@ function App() {
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'America/Lima'
     });
   };
 
@@ -397,7 +419,10 @@ function App() {
               />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Partner Design Thinking</h1>
-                <p className="text-gray-600 text-sm">Panel de Administración - {user?.nombre || 'Usuario'}</p>
+                <p className="text-gray-600 text-sm">
+                  Panel de Administración - {user?.nombre || 'Usuario'}
+                  {user?.isSupremeBoss && <span className="ml-2 text-blue-600 font-semibold">👑 Jefe Supremo</span>}
+                </p>
               </div>
             </div>
             <button 
@@ -434,21 +459,6 @@ function App() {
               onClick={() => setActiveTab('feedback')}
             >
               💬 Feedback
-            </button>
-            <button 
-              className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
-            >
-              👥 Usuarios
-            </button>
-            <button 
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                activeTab === 'reporte' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-              onClick={() => setActiveTab('reporte')}
-            >
-              📊 Reporte de Empleados
             </button>
           </div>
         </div>
@@ -497,7 +507,6 @@ function App() {
                   className="bg-blue-600 text-white px-6 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
                   onClick={() => {
                     setShowForm(!showForm);
-                    // Pre-rellenar el responsable con el DNI del usuario actual
                     if (!showForm && user) {
                       setNuevaTarea(prev => ({
                         ...prev,
@@ -811,7 +820,6 @@ function App() {
                           {!editingTarea && (
                             <td className="px-6 py-4">
                               <div className="relative">
-                                {/* Mostrar botón de chat si hay mensajes o si es el jefe supremo */}
                                 {(tarea.TotalMensajes > 0 || user.isSupremeBoss) && (
                                   <button
                                     onClick={() => abrirChat(tarea.Id)}
@@ -828,7 +836,6 @@ function App() {
                                     )}
                                   </button>
                                 )}
-                                {/* Mostrar mensaje informativo para trabajadores cuando no hay observaciones del jefe */}
                                 {!user.isSupremeBoss && tarea.TotalMensajes === 0 && (
                                   <div className="text-gray-400 text-xs text-center px-2 py-1" title="Esperando observación del jefe supremo">
                                     ⏳
@@ -862,7 +869,6 @@ function App() {
                 </table>
               </div>
             </div>
-
 
             {/* Chat Popover */}
             {chatAbierto && (
@@ -898,22 +904,17 @@ function App() {
                       mensajes[chatAbierto]?.map((mensaje) => (
                         <div
                           key={mensaje.Id}
-                          className={`flex ${mensaje.Emisor === user.dni ? 'justify-end' : 'justify-start'}`}
+                          className={`flex ${mensaje.EmisorDNI === user.dni ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
                             className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              mensaje.Emisor === user.dni
+                              mensaje.EmisorDNI === user.dni
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-100 text-gray-900'
                             }`}
                           >
                             <div className="text-xs opacity-75 mb-1">
-                              {mensaje.NombreEmisor || mensaje.Emisor}
-                              {mensaje.NombreReceptor && (
-                                <span className="ml-2 text-gray-400">
-                                  → {mensaje.NombreReceptor}
-                                </span>
-                              )}
+                              {mensaje.EmisorNombre}
                             </div>
                             <div className="text-sm">{mensaje.Mensaje}</div>
                             <div className="text-xs opacity-75 mt-1">
@@ -927,13 +928,6 @@ function App() {
                   </div>
                   
                   <form onSubmit={enviarMensaje} className="p-4 border-t border-gray-200">
-                    {!user.isSupremeBoss && (
-                      <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                        <p className="text-sm text-blue-700">
-                          💡 Puedes responder a las observaciones del jefe supremo. Solo puedes enviar mensajes después de que él haya escrito algo.
-                        </p>
-                      </div>
-                    )}
                     <div className="flex space-x-2">
                       <input
                         type="text"
@@ -958,68 +952,6 @@ function App() {
         )}
 
         {activeTab === 'feedback' && <Feedback />}
-
-        {activeTab === 'reporte' && (
-          <div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">📊 Reporte de Empleados con Tareas Pendientes</h2>
-              
-              {loading ? (
-                <div className="text-center py-12">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <p className="mt-4 text-gray-600">Cargando reporte...</p>
-                </div>
-              ) : reporteEmpleados.length === 0 ? (
-                <div className="text-center py-12">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">¡Excelente!</h3>
-                  <p className="mt-1 text-sm text-gray-500">No hay empleados con tareas pendientes.</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {reporteEmpleados.map((empleado) => (
-                    <div key={empleado.DNI} className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">{empleado.Nombre}</h3>
-                          <p className="text-sm text-gray-600">DNI: {empleado.DNI} • {empleado.Rol}</p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-red-600">{empleado.TareasPendientes}</div>
-                          <div className="text-sm text-gray-600">Tareas Pendientes</div>
-                        </div>
-                      </div>
-                      
-                      {empleado.Tareas && empleado.Tareas.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700 mb-3">Tareas Pendientes:</h4>
-                          <div className="space-y-2">
-                            {empleado.Tareas.map((tarea, index) => (
-                              <div key={index} className="bg-white rounded-md p-3 border border-gray-200">
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-900">{tarea.Titulo}</p>
-                                    <p className="text-xs text-gray-500">ID: {tarea.Id}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-xs text-gray-500">Fecha límite:</p>
-                                    <p className="text-sm font-medium text-gray-900">{formatDate(tarea.FechaFin)}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

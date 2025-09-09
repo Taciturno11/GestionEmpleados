@@ -1,11 +1,16 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'partner-design-thinking-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura_2024';
 
-// Middleware para verificar token JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = authHeader && authHeader.split(' ')[1];
+
+  console.log('🔍 BACKEND - Middleware auth:', {
+    url: req.url,
+    token: token ? token.substring(0, 20) + '...' : 'null',
+    authHeader: authHeader ? authHeader.substring(0, 30) + '...' : 'null'
+  });
 
   if (!token) {
     return res.status(401).json({ error: 'Token de acceso requerido' });
@@ -13,14 +18,21 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      console.log('❌ BACKEND - Token inválido:', err.message);
       return res.status(403).json({ error: 'Token inválido' });
     }
+    
+    console.log('✅ BACKEND - Token válido, usuario:', {
+      dni: user.dni,
+      nombre: user.nombre,
+      isSupremeBoss: user.isSupremeBoss
+    });
+    
     req.user = user;
     next();
   });
 };
 
-// Middleware para verificar si es jefe supremo
 const isSupremeBoss = (req, res, next) => {
   if (req.user.dni !== '44991089') {
     return res.status(403).json({ error: 'Acceso denegado. Solo el jefe supremo puede realizar esta acción.' });
@@ -28,15 +40,4 @@ const isSupremeBoss = (req, res, next) => {
   next();
 };
 
-// Middleware para verificar si es jefe supremo o usuario regular
-const isSupremeBossOrRegular = (req, res, next) => {
-  // Cualquier usuario autenticado puede acceder
-  next();
-};
-
-module.exports = {
-  authenticateToken,
-  isSupremeBoss,
-  isSupremeBossOrRegular,
-  JWT_SECRET
-};
+module.exports = { authenticateToken, isSupremeBoss };
