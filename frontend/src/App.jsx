@@ -356,7 +356,7 @@ function App() {
     }
     
     // Marcar mensajes como leídos para ambos tipos de usuario
-    await marcarMensajesComoLeidos(tareaId);
+      await marcarMensajesComoLeidos(tareaId);
     
     setTimeout(() => {
       if (chatEndRef.current) {
@@ -427,15 +427,26 @@ function App() {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
+    if (!dateString) return '';
+    
+    // Si la fecha viene como "YYYY-MM-DD", agregamos "T00:00:00" para evitar problemas de zona horaria
+    let dateToFormat = dateString;
+    if (dateString && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      dateToFormat = dateString + 'T00:00:00';
+    }
+    
+    const date = new Date(dateToFormat);
     return date.toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC' // Forzamos UTC para evitar problemas de zona horaria
     });
   };
 
   const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    
     const date = new Date(dateString);
     return date.toLocaleString('es-ES', {
       day: '2-digit',
@@ -443,7 +454,7 @@ function App() {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      timeZone: 'America/Lima'
+      timeZone: 'UTC' // Forzamos UTC para evitar problemas de zona horaria
     });
   };
 
@@ -516,14 +527,14 @@ function App() {
                 <div className="text-center">
                   <div className="text-lg font-bold text-green-600">{stats.Terminadas || 0}</div>
                   <div className="text-xs text-gray-500">Completadas</div>
-                </div>
               </div>
-              <button 
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors font-medium"
-                onClick={handleLogout}
-              >
-                Cerrar Sesión
-              </button>
+            </div>
+            <button 
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors font-medium"
+              onClick={handleLogout}
+            >
+              Cerrar Sesión
+            </button>
             </div>
           </div>
         </div>
@@ -554,7 +565,7 @@ function App() {
                       📋 Mostrando tareas de: {empleados.find(e => e.DNI === empleadoSeleccionado)?.NombreCompleto}
                     </span>
                   </div>
-                  <button
+            <button 
                     onClick={() => {
                       setEmpleadoSeleccionado(null);
                       cargarTareas();
@@ -562,145 +573,153 @@ function App() {
                     className="text-blue-600 hover:text-blue-800 font-medium text-sm"
                   >
                     ✕ Ver todas las tareas
-                  </button>
+            </button>
                 </div>
               </div>
               )}
 
-              {/* Tasks Table */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-800">Historial de Tareas</h3>
+              {/* Tasks Table - Pizarra Moderna */}
+              <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+                <div className="px-6 py-5 bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-300">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-white">📋 Historial de Tareas</h3>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto bg-white">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gradient-to-r from-slate-100 to-slate-200">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Tarea
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-48">
+                          📝 Tarea
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Responsable
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-32">
+                          👤 Responsable
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Estado
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
+                          📊 Estado
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Prioridad
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-20">
+                          ⚡ Prioridad
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Progreso
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-32">
+                          📈 Progreso
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Fechas
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-28">
+                          📅 Fechas
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Observaciones
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
+                          💬 Chat
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Acciones
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-20">
+                          ⚙️ Acciones
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white divide-y divide-slate-200">
                       {tareas.map((tarea) => (
-                        <tr key={tarea.Id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={tarea.Id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 group transition-all duration-200 border-l-4 border-transparent hover:border-blue-400">
+                          <td className="px-4 py-3 w-48">
                             <div>
-                              <div className="text-sm font-medium text-gray-900">{tarea.Titulo}</div>
-                              <div className="text-sm text-gray-500 max-w-xs truncate">{tarea.Descripcion}</div>
+                              <div className="text-sm font-semibold text-slate-800 truncate">{tarea.Titulo}</div>
+                              <div className="text-xs text-slate-500 truncate">{tarea.Descripcion}</div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{tarea.NombreResponsable}</div>
+                          <td className="px-3 py-3 w-32">
+                            <div className="text-sm text-slate-700 truncate font-medium">{tarea.NombreResponsable}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              tarea.Estado === 'Completada' ? 'bg-green-100 text-green-800' :
-                              tarea.Estado === 'En Progreso' ? 'bg-blue-100 text-blue-800' :
-                              'bg-amber-100 text-amber-800'
+                          <td className="px-3 py-3 w-24">
+                            <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
+                              tarea.Estado === 'Completada' ? 'bg-green-100 text-green-800 border border-green-200' :
+                              tarea.Estado === 'En Progreso' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                              'bg-amber-100 text-amber-800 border border-amber-200'
                             }`}>
                               {tarea.Estado}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              tarea.Prioridad === 'Alta' ? 'bg-red-100 text-red-800' :
-                              tarea.Prioridad === 'Media' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
+                          <td className="px-3 py-3 w-20">
+                            <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
+                              tarea.Prioridad === 'Alta' ? 'bg-red-100 text-red-800 border border-red-200' :
+                              tarea.Prioridad === 'Media' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                              'bg-green-100 text-green-800 border border-green-200'
                             }`}>
                               {tarea.Prioridad}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex-1">
-                                <div className="w-full bg-gray-200 rounded-full h-2 relative">
-                                  <div
-                                    className={`h-2 rounded-full transition-all duration-300 ${
-                                      (tarea.Progreso || 0) >= 80 ? 'bg-green-500' :
-                                      (tarea.Progreso || 0) >= 50 ? 'bg-blue-500' :
-                                      (tarea.Progreso || 0) >= 25 ? 'bg-yellow-500' :
-                                      'bg-red-500'
-                                    }`}
-                                    style={{ width: `${tarea.Progreso || 0}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="100"
-                                  value={tarea.Progreso || 0}
-                                  onChange={(e) => actualizarProgreso(tarea.Id, e.target.value)}
-                                  className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                                  style={{
-                                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${tarea.Progreso || 0}%, #e5e7eb ${tarea.Progreso || 0}%, #e5e7eb 100%)`
-                                  }}
-                                />
-                                <span className="text-sm font-medium text-gray-700 min-w-[3rem] text-center">
-                                  {tarea.Progreso || 0}%
-                                </span>
-                              </div>
+                          <td className="px-4 py-3 w-32">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={tarea.Progreso || 0}
+                                onChange={(e) => actualizarProgreso(tarea.Id, e.target.value)}
+                                className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                                style={{
+                                  background: `linear-gradient(to right, ${
+                                    (tarea.Progreso || 0) >= 80 ? '#10b981' :
+                                    (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
+                                    (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
+                                    '#ef4444'
+                                  } 0%, ${
+                                    (tarea.Progreso || 0) >= 80 ? '#10b981' :
+                                    (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
+                                    (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
+                                    '#ef4444'
+                                  } ${tarea.Progreso || 0}%, #e5e7eb ${tarea.Progreso || 0}%, #e5e7eb 100%)`
+                                }}
+                              />
+                              <span className="text-xs font-medium text-gray-700 min-w-[2.5rem] text-center">
+                                {tarea.Progreso || 0}%
+                              </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <div>Inicio: {new Date(tarea.FechaInicio).toLocaleDateString('es-ES')}</div>
-                            <div>Fin: {new Date(tarea.FechaFin).toLocaleDateString('es-ES')}</div>
+                          <td className="px-3 py-3 w-28">
+                            <div className="text-xs text-slate-600 space-y-1">
+                              <div className="truncate font-medium">📅 {formatDate(tarea.FechaInicio)}</div>
+                              <div className="truncate">⏰ {formatDate(tarea.FechaFin)}</div>
+                            </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 py-3 w-24">
                             <button
                               onClick={() => abrirChat(tarea.Id)}
-                              className="relative inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              className="relative inline-flex items-center px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium transition-colors duration-200 border border-blue-200"
                             >
-                              💬 Observaciones
+                              💬 Chat
                               {tarea.MensajesNoLeidos > 0 && (
-                                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
                                   {tarea.MensajesNoLeidos}
                                 </span>
                               )}
                             </button>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button
-                              onClick={() => editarTarea(tarea)}
-                              className="text-blue-600 hover:text-blue-900 mr-3"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => eliminarTarea(tarea.Id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Eliminar
-                            </button>
+                          <td className="px-3 py-3 w-20">
+                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              <button
+                                onClick={() => editarTarea(tarea)}
+                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-all duration-200"
+                                title="Editar tarea"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => eliminarTarea(tarea.Id)}
+                                className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-all duration-200"
+                                title="Eliminar tarea"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
+        </div>
               </div>
             </>
           )}
@@ -713,25 +732,25 @@ function App() {
           {/* Vista para trabajadores */}
           {!user.isSupremeBoss && (
             <>
-              {/* Task Management */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                  <div className="flex flex-wrap gap-2">
-                    <button className="px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
-                      Todas
-                    </button>
-                    <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                      Pendientes
-                    </button>
-                    <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                      En Progreso
-                    </button>
-                    <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-                      Completadas
-                    </button>
-                  </div>
-                  <button 
-                    className="bg-blue-600 text-white px-6 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
+            {/* Task Management */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex flex-wrap gap-2">
+                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
+                    Todas
+                  </button>
+                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    Pendientes
+                  </button>
+                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    En Progreso
+                  </button>
+                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    Completadas
+                  </button>
+                </div>
+                <button 
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
                     onClick={() => {
                       setShowForm(!showForm);
                       if (!showForm && user) {
@@ -741,12 +760,12 @@ function App() {
                         }));
                       }
                     }}
-                  >
-                    + Nueva Tarea
-                  </button>
-                </div>
+                >
+                  + Nueva Tarea
+                </button>
               </div>
-            )}
+            </div>
+            
 
 
             {/* Form */}
@@ -871,57 +890,58 @@ function App() {
               </div>
             )}
 
-            {/* Tasks Table */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-800">Historial de Tareas</h3>
+            {/* Tasks Table - Pizarra Moderna */}
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+              <div className="px-6 py-5 bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-300">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-white">📋 Mis Tareas</h3>
+                </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto bg-white">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gradient-to-r from-slate-100 to-slate-200">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Título de la Tarea
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-48">
+                        📝 Tarea
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Fecha Inicio
+                      <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-28">
+                        📅 Fechas
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Fecha Fin
+                      <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-20">
+                        ⚡ Prioridad
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Prioridad
+                      <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-32">
+                        📈 Progreso
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Progreso
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Responsable
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Estado
+                      <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
+                        📊 Estado
                       </th>
                       {!editingTarea && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Observaciones
+                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
+                          💬 Chat
                         </th>
                       )}
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                        Acciones
+                      <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-20">
+                        ⚙️ Acciones
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-slate-200">
                     {loading ? (
                       <tr>
-                        <td colSpan={editingTarea ? "8" : "9"} className="px-6 py-4 text-center">
+                        <td colSpan={editingTarea ? "6" : "7"} className="px-6 py-4 text-center">
                           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                           <p className="mt-2 text-gray-600">Cargando tareas...</p>
                         </td>
                       </tr>
                     ) : tareas.length === 0 ? (
                       <tr>
-                        <td colSpan={editingTarea ? "8" : "9"} className="px-6 py-4 text-center">
+                        <td colSpan={editingTarea ? "6" : "7"} className="px-6 py-4 text-center">
                           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                           </svg>
@@ -931,8 +951,8 @@ function App() {
                       </tr>
                     ) : (
                       tareas.map((tarea) => (
-                        <tr key={tarea.Id} className={`hover:bg-gray-50 ${editingTarea === tarea.Id ? 'bg-blue-50 border-l-4 border-blue-400' : ''}`}>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={tarea.Id} className={`hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 group transition-all duration-200 border-l-4 border-transparent hover:border-blue-400 ${editingTarea === tarea.Id ? 'bg-blue-50 border-l-4 border-blue-400' : ''}`}>
+                          <td className="px-4 py-3 w-48">
                             {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
                               <input
                                 type="text"
@@ -946,54 +966,39 @@ function App() {
                                 }}
                               />
                             ) : (
-                              <div className="text-sm font-medium text-gray-900 px-2 py-1 rounded">
+                              <div className="text-sm font-semibold text-slate-800 truncate">
                                 {tarea.Titulo}
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-3 py-3 w-28">
                             {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
-                              <input
-                                type="date"
-                                defaultValue={tarea.FechaInicio ? tarea.FechaInicio.split('T')[0] : ''}
-                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                onBlur={(e) => actualizarCampo(tarea.Id, 'fechaInicio', e.target.value)}
-                                onKeyPress={(e) => {
-                                  if (e.key === 'Enter') {
-                                    actualizarCampo(tarea.Id, 'fechaInicio', e.target.value);
-                                  }
-                                }}
-                              />
+                              <div className="space-y-1">
+                                <input
+                                  type="date"
+                                  defaultValue={tarea.FechaInicio ? tarea.FechaInicio.split('T')[0] : ''}
+                                  className="w-full px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  onBlur={(e) => actualizarCampo(tarea.Id, 'fechaInicio', e.target.value)}
+                                />
+                                <input
+                                  type="date"
+                                  defaultValue={tarea.FechaFin ? tarea.FechaFin.split('T')[0] : ''}
+                                  className="w-full px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  onBlur={(e) => actualizarCampo(tarea.Id, 'fechaFin', e.target.value)}
+                                />
+                              </div>
                             ) : (
-                              <div className="px-2 py-1 rounded">
-                                {formatDate(tarea.FechaInicio)}
+                              <div className="text-xs text-slate-600 space-y-1">
+                                <div className="truncate font-medium">📅 {formatDate(tarea.FechaInicio)}</div>
+                                <div className="truncate">⏰ {formatDate(tarea.FechaFin)}</div>
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
-                              <input
-                                type="date"
-                                defaultValue={tarea.FechaFin ? tarea.FechaFin.split('T')[0] : ''}
-                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                onBlur={(e) => actualizarCampo(tarea.Id, 'fechaFin', e.target.value)}
-                                onKeyPress={(e) => {
-                                  if (e.key === 'Enter') {
-                                    actualizarCampo(tarea.Id, 'fechaFin', e.target.value);
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <div className="px-2 py-1 rounded">
-                                {formatDate(tarea.FechaFin)}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 py-3 w-20">
                             {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
                               <select
                                 defaultValue={tarea.Prioridad}
-                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 onBlur={(e) => actualizarCampo(tarea.Id, 'prioridad', e.target.value)}
                                 onChange={(e) => actualizarCampo(tarea.Id, 'prioridad', e.target.value)}
                               >
@@ -1003,70 +1008,45 @@ function App() {
                               </select>
                             ) : (
                               <span 
-                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getPriorityColor(tarea.Prioridad)}`}
+                                className={`inline-flex px-2 py-1 text-xs font-bold rounded-full border ${getPriorityColor(tarea.Prioridad)}`}
                               >
                                 {tarea.Prioridad}
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex-1">
-                                <div className="w-full bg-gray-200 rounded-full h-2 relative">
-                                  <div
-                                    className={`h-2 rounded-full transition-all duration-300 ${
-                                      (tarea.Progreso || 0) >= 80 ? 'bg-green-500' :
-                                      (tarea.Progreso || 0) >= 50 ? 'bg-blue-500' :
-                                      (tarea.Progreso || 0) >= 25 ? 'bg-yellow-500' :
-                                      'bg-red-500'
-                                    }`}
-                                    style={{ width: `${tarea.Progreso || 0}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="100"
-                                  value={tarea.Progreso || 0}
-                                  onChange={(e) => actualizarProgreso(tarea.Id, e.target.value)}
-                                  className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                                  style={{
-                                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${tarea.Progreso || 0}%, #e5e7eb ${tarea.Progreso || 0}%, #e5e7eb 100%)`
-                                  }}
-                                />
-                                <span className="text-sm font-medium text-gray-700 min-w-[3rem] text-center">
-                                  {tarea.Progreso || 0}%
-                                </span>
-                              </div>
+                          <td className="px-4 py-3 w-32">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={tarea.Progreso || 0}
+                                onChange={(e) => actualizarProgreso(tarea.Id, e.target.value)}
+                                className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                                style={{
+                                  background: `linear-gradient(to right, ${
+                                    (tarea.Progreso || 0) >= 80 ? '#10b981' :
+                                    (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
+                                    (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
+                                    '#ef4444'
+                                  } 0%, ${
+                                    (tarea.Progreso || 0) >= 80 ? '#10b981' :
+                                    (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
+                                    (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
+                                    '#ef4444'
+                                  } ${tarea.Progreso || 0}%, #e5e7eb ${tarea.Progreso || 0}%, #e5e7eb 100%)`
+                                }}
+                              />
+                              <span className="text-xs font-medium text-gray-700 min-w-[2.5rem] text-center">
+                                {tarea.Progreso || 0}%
+                              </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {user.isSupremeBoss && editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
-                              <select
-                                defaultValue={tarea.Responsable}
-                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                onBlur={(e) => actualizarCampo(tarea.Id, 'responsable', e.target.value)}
-                                onChange={(e) => actualizarCampo(tarea.Id, 'responsable', e.target.value)}
-                              >
-                                {usuarios.map(usuario => (
-                                  <option key={usuario.DNI} value={usuario.DNI}>
-                                    {usuario.Nombres} {usuario.ApellidoPaterno}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <div className="px-2 py-1 rounded">
-                                {tarea.NombreResponsable || tarea.Responsable}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 py-3 w-24">
                             {editingTarea === tarea.Id && editingField === 'modoEdicion' ? (
                               <select
                                 defaultValue={tarea.Estado}
-                                className="px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 onBlur={(e) => actualizarCampo(tarea.Id, 'estado', e.target.value)}
                                 onChange={(e) => actualizarCampo(tarea.Id, 'estado', e.target.value)}
                               >
@@ -1076,54 +1056,54 @@ function App() {
                               </select>
                             ) : (
                               <span 
-                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(tarea.Estado)}`}
+                                className={`inline-flex px-2 py-1 text-xs font-bold rounded-full border ${getStatusColor(tarea.Estado)}`}
                               >
                                 {tarea.Estado}
                               </span>
                             )}
                           </td>
                           {!editingTarea && (
-                            <td className="px-6 py-4">
+                            <td className="px-3 py-3 w-24">
                               <div className="relative">
                                 {(tarea.TotalMensajes > 0 || user.isSupremeBoss) && (
                                   <button
                                     onClick={() => abrirChat(tarea.Id)}
-                                    className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
+                                    className="relative p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-all duration-200"
                                     title={user.isSupremeBoss ? "Ver observaciones" : "Responder a observación del jefe"}
                                   >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                     </svg>
                                     {tarea.MensajesNoLeidos > 0 && (
-                                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold min-w-[24px]">
+                                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold min-w-[20px]">
                                         {tarea.MensajesNoLeidos}
                                       </span>
                                     )}
                                   </button>
                                 )}
                                 {!user.isSupremeBoss && tarea.TotalMensajes === 0 && (
-                                  <div className="text-gray-400 text-xs text-center px-2 py-1" title="Esperando observación del jefe supremo">
+                                  <div className="text-gray-400 text-xs text-center px-1 py-1" title="Esperando observación del jefe supremo">
                                     ⏳
                                   </div>
                                 )}
                               </div>
                             </td>
                           )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium pl-0 pr-2">
+                          <td className="px-3 py-3 w-20">
                             <div className="flex space-x-1 justify-start">
                               <button 
-                                className={`px-1 py-1 ${editingTarea === tarea.Id ? 'text-green-600 hover:text-green-900' : 'text-blue-600 hover:text-blue-900'}`}
+                                className={`p-1.5 text-xs rounded-lg transition-all duration-200 ${editingTarea === tarea.Id ? 'text-green-600 hover:text-green-800 hover:bg-green-100' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-100'}`}
                                 onClick={() => editingTarea === tarea.Id ? cancelarEdicionInline() : activarModoEdicion(tarea.Id)}
                                 title={editingTarea === tarea.Id ? "Haz clic para cancelar edición" : "Haz clic para editar"}
                               >
-                                {editingTarea === tarea.Id ? '✅ Listo' : '✏️ Editar'}
+                                {editingTarea === tarea.Id ? '✓' : '✏️'}
                               </button>
                               <button 
-                                className="text-red-600 hover:text-red-900 px-1 py-1"
+                                className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-all duration-200 text-xs"
                                 onClick={() => eliminarTarea(tarea.Id)}
                                 title="Eliminar tarea"
                               >
-                                🗑️ Eliminar
+                                🗑️
                               </button>
                             </div>
                           </td>
@@ -1137,7 +1117,7 @@ function App() {
             </>
           )}
 
-          {/* Chat Popover */}
+            {/* Chat Popover */}
             {chatAbierto && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">

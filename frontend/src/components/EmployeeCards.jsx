@@ -24,11 +24,19 @@ const EmployeeCards = ({ empleados, onSelectEmpleado, empleadoSeleccionado, tare
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Sin fecha';
-    const date = new Date(dateString);
+    
+    // Si la fecha viene como "YYYY-MM-DD", agregamos "T00:00:00" para evitar problemas de zona horaria
+    let dateToFormat = dateString;
+    if (dateString && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      dateToFormat = dateString + 'T00:00:00';
+    }
+    
+    const date = new Date(dateToFormat);
     return date.toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC' // Forzamos UTC para evitar problemas de zona horaria
     });
   };
 
@@ -144,7 +152,34 @@ const EmployeeCards = ({ empleados, onSelectEmpleado, empleadoSeleccionado, tare
                     {empleado.ProximaFechaVencimiento && (
                       <div className="flex justify-between">
                         <span>Próximo vencimiento:</span>
-                        <span className="font-semibold">{formatDate(empleado.ProximaFechaVencimiento)}</span>
+                        <span className={`font-semibold ${
+                          (() => {
+                            // Usar la misma lógica de zona horaria que formatDate
+                            let dateToCompare = empleado.ProximaFechaVencimiento;
+                            if (dateToCompare && dateToCompare.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                              dateToCompare = dateToCompare + 'T00:00:00';
+                            }
+                            const fechaVencimiento = new Date(dateToCompare);
+                            const hoy = new Date();
+                            const en3Dias = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                            
+                            if (fechaVencimiento < hoy) {
+                              return 'text-red-600';
+                            } else if (fechaVencimiento <= en3Dias) {
+                              return 'text-amber-600';
+                            } else {
+                              return 'text-gray-700';
+                            }
+                          })()
+                        }`}>
+                          {formatDate(empleado.ProximaFechaVencimiento)}
+                        </span>
+                      </div>
+                    )}
+                    {empleado.TareasVencidas > 0 && (
+                      <div className="flex justify-between">
+                        <span>Tareas vencidas:</span>
+                        <span className="font-semibold text-red-600">{empleado.TareasVencidas}</span>
                       </div>
                     )}
                   </div>

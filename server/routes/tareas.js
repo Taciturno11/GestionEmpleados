@@ -132,11 +132,15 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Solo puedes crear tareas para ti mismo' });
     }
 
+    // Convertir fechas a formato ISO para evitar problemas de zona horaria
+    const fechaInicioISO = new Date(fechaInicio + 'T00:00:00.000Z').toISOString();
+    const fechaFinISO = new Date(fechaFin + 'T00:00:00.000Z').toISOString();
+
     const result = await pool.request()
       .input('titulo', titulo)
       .input('responsable', responsable)
-      .input('fechaInicio', fechaInicio)
-      .input('fechaFin', fechaFin)
+      .input('fechaInicio', fechaInicioISO)
+      .input('fechaFin', fechaFinISO)
       .input('prioridad', prioridad)
       .input('estado', estado)
       .input('observaciones', observaciones || null)
@@ -171,6 +175,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     const pool = await connectDB();
     
+    // Convertir fechas a formato ISO para evitar problemas de zona horaria
+    const fechaInicioISO = new Date(fechaInicio + 'T00:00:00.000Z').toISOString();
+    const fechaFinISO = new Date(fechaFin + 'T00:00:00.000Z').toISOString();
+    
     let query = '';
     if (req.user.isSupremeBoss) {
       // Jefe supremo puede actualizar cualquier tarea
@@ -192,8 +200,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
       .input('id', id)
       .input('titulo', titulo)
       .input('responsable', responsable)
-      .input('fechaInicio', fechaInicio)
-      .input('fechaFin', fechaFin)
+      .input('fechaInicio', fechaInicioISO)
+      .input('fechaFin', fechaFinISO)
       .input('prioridad', prioridad)
       .input('estado', estado)
       .input('observaciones', observaciones || null)
@@ -548,7 +556,8 @@ router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
           SUM(CASE WHEN t.Estado = 'Completada' THEN 1 ELSE 0 END) as TareasCompletadas,
           SUM(CASE WHEN t.Prioridad = 'Alta' AND t.Estado != 'Completada' THEN 1 ELSE 0 END) as TareasAltaPrioridad,
           MAX(t.FechaCreacion) as UltimaTareaCreada,
-          MAX(t.FechaFin) as ProximaFechaVencimiento
+          MIN(CASE WHEN t.Estado != 'Completada' THEN t.FechaFin END) as ProximaFechaVencimiento,
+          SUM(CASE WHEN t.Estado != 'Completada' AND t.FechaFin < GETDATE() THEN 1 ELSE 0 END) as TareasVencidas
         FROM PRI.Empleados e
         INNER JOIN Tareas t ON e.DNI = t.Responsable
         WHERE e.CargoID IN (4, 8) AND e.DNI != '44991089'
