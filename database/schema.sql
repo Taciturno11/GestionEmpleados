@@ -108,3 +108,4 @@ PRINT '📊 Tablas creadas: Tareas, MensajesObservaciones, Feedback, RespuestasF
 PRINT '🔧 Índices creados para optimizar rendimiento'
 PRINT '📝 Datos de prueba insertados con nombres directos'
 PRINT '🎯 Sistema listo para usar!'
+

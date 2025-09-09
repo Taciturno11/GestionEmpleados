@@ -280,3 +280,5 @@ const FeedbackEquipo = () => {
 };
 
 export default FeedbackEquipo;
+
+
