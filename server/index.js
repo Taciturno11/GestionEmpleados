@@ -55,12 +55,16 @@ app.use('*', (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
-    app.listen(PORT, () => {
-      console.log('🚀 Servidor corriendo en http://localhost:' + PORT);
-      console.log('📊 API disponible en http://localhost:' + PORT + '/api');
-      console.log('🔐 Auth: http://localhost:' + PORT + '/api/auth');
-      console.log('💬 Feedback: http://localhost:' + PORT + '/api/feedback');
-      console.log('📋 Tareas: http://localhost:' + PORT + '/api/tareas');
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log('🚀 Servidor corriendo en:');
+      console.log('   📍 Local: http://localhost:' + PORT);
+      console.log('   🌐 Red: http://10.182.18.74:' + PORT);
+      console.log('📊 API disponible en:');
+      console.log('   📍 Local: http://localhost:' + PORT + '/api');
+      console.log('   🌐 Red: http://10.182.18.74:' + PORT + '/api');
+      console.log('🔐 Auth: http://10.182.18.74:' + PORT + '/api/auth');
+      console.log('💬 Feedback: http://10.182.18.74:' + PORT + '/api/feedback');
+      console.log('📋 Tareas: http://10.182.18.74:' + PORT + '/api/tareas');
     });
   } catch (error) {
     console.error('❌ Error iniciando servidor:', error);
