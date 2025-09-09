@@ -4,6 +4,7 @@ import Login from './components/Login';
 import EmployeeCards from './components/EmployeeCards';
 import Sidebar from './components/Sidebar';
 import Calendar from './components/Calendar';
+import FeedbackSemanal from './components/FeedbackSemanal';
 
 // Configurar axios para usar rutas relativas
 const api = axios.create({
@@ -765,6 +766,9 @@ function App() {
                 </button>
               </div>
             </div>
+
+            {/* Feedback Semanal */}
+            <FeedbackSemanal empleadoDNI={user.dni} />
             
 
 
