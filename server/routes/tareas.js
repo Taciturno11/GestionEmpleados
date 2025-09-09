@@ -7,20 +7,35 @@ const { authenticateToken, isSupremeBoss } = require('../middleware/auth');
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const pool = await connectDB();
+    const { empleado } = req.query;
     let query = '';
 
     if (req.user.isSupremeBoss) {
-      // Jefe supremo ve TODAS las tareas
-      query = `
-        SELECT 
-          t.*,
-          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
-          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.EmisorDNI != @userDNI) as MensajesNoLeidos,
-          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
-        FROM Tareas t
-        LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
-        ORDER BY t.FechaCreacion DESC
-      `;
+      // Jefe supremo ve TODAS las tareas o filtradas por empleado
+      if (empleado) {
+        query = `
+          SELECT 
+            t.*,
+            LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.EmisorDNI != @userDNI) as MensajesNoLeidos,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
+          FROM Tareas t
+          LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+          WHERE t.Responsable = @empleadoDNI
+          ORDER BY t.FechaCreacion DESC
+        `;
+      } else {
+        query = `
+          SELECT 
+            t.*,
+            LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.EmisorDNI != @userDNI) as MensajesNoLeidos,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
+          FROM Tareas t
+          LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+          ORDER BY t.FechaCreacion DESC
+        `;
+      }
     } else {
       // Trabajador ve SOLO sus tareas
       query = `
@@ -36,9 +51,14 @@ router.get('/', authenticateToken, async (req, res) => {
       `;
     }
 
-    const result = await pool.request()
-      .input('userDNI', req.user.dni)
-      .query(query);
+    const request = pool.request()
+      .input('userDNI', req.user.dni);
+    
+    if (empleado) {
+      request.input('empleadoDNI', empleado);
+    }
+    
+    const result = await request.query(query);
     
     res.json(result.recordset);
   } catch (error) {
@@ -90,7 +110,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
 // POST - Crear nueva tarea
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { titulo, responsable, fechaInicio, fechaFin, prioridad, estado, observaciones } = req.body;
+    const { titulo, responsable, fechaInicio, fechaFin, prioridad, estado, observaciones, progreso = 0 } = req.body;
     
     if (!titulo || !responsable || !fechaInicio || !fechaFin || !prioridad || !estado) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
@@ -120,9 +140,10 @@ router.post('/', authenticateToken, async (req, res) => {
       .input('prioridad', prioridad)
       .input('estado', estado)
       .input('observaciones', observaciones || null)
+      .input('progreso', Math.max(0, Math.min(100, parseInt(progreso) || 0)))
       .query(`
-        INSERT INTO Tareas (Titulo, Responsable, FechaInicio, FechaFin, Prioridad, Estado, Observaciones)
-        VALUES (@titulo, @responsable, @fechaInicio, @fechaFin, @prioridad, @estado, @observaciones);
+        INSERT INTO Tareas (Titulo, Responsable, FechaInicio, FechaFin, Prioridad, Estado, Observaciones, Progreso)
+        VALUES (@titulo, @responsable, @fechaInicio, @fechaFin, @prioridad, @estado, @observaciones, @progreso);
         SELECT SCOPE_IDENTITY() as Id;
       `);
 
@@ -403,6 +424,53 @@ router.post('/:id/mensajes', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT - Actualizar progreso de una tarea
+router.put('/:id/progreso', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { progreso } = req.body;
+    
+    if (progreso === undefined || progreso === null) {
+      return res.status(400).json({ error: 'El progreso es requerido' });
+    }
+    
+    const progresoNum = Math.max(0, Math.min(100, parseInt(progreso)));
+    
+    const pool = await connectDB();
+    
+    // Verificar que la tarea existe y el usuario tiene acceso
+    let query = '';
+    if (req.user.isSupremeBoss) {
+      query = 'SELECT * FROM Tareas WHERE Id = @id';
+    } else {
+      query = 'SELECT * FROM Tareas WHERE Id = @id AND Responsable = @userDNI';
+    }
+    
+    const tareaResult = await pool.request()
+      .input('id', id)
+      .input('userDNI', req.user.dni)
+      .query(query);
+    
+    if (tareaResult.recordset.length === 0) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    
+    // Actualizar el progreso
+    await pool.request()
+      .input('id', id)
+      .input('progreso', progresoNum)
+      .query('UPDATE Tareas SET Progreso = @progreso WHERE Id = @id');
+    
+    res.json({ 
+      message: 'Progreso actualizado exitosamente', 
+      progreso: progresoNum 
+    });
+  } catch (error) {
+    console.error('❌ Error actualizando progreso:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // PUT - Marcar mensajes como leídos
 router.put('/:id/mensajes/leer', authenticateToken, async (req, res) => {
   try {
@@ -453,6 +521,45 @@ router.put('/:id/mensajes/leer', authenticateToken, async (req, res) => {
     res.json({ message: 'Mensajes marcados como leídos', mensajesActualizados: result.rowsAffected[0] });
   } catch (error) {
     console.error('❌ Error marcando mensajes como leídos:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// GET - Obtener empleados con tareas pendientes (solo para jefe supremo)
+router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.isSupremeBoss) {
+      return res.status(403).json({ error: 'Acceso denegado. Solo el jefe supremo puede ver esta información.' });
+    }
+
+    const pool = await connectDB();
+    
+    const result = await pool.request()
+      .query(`
+        SELECT 
+          e.DNI,
+          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreCompleto,
+          e.Nombres,
+          e.ApellidoPaterno,
+          e.ApellidoMaterno,
+          COUNT(t.Id) as TotalTareas,
+          SUM(CASE WHEN t.Estado = 'Pendiente' THEN 1 ELSE 0 END) as TareasPendientes,
+          SUM(CASE WHEN t.Estado = 'En Progreso' THEN 1 ELSE 0 END) as TareasEnProgreso,
+          SUM(CASE WHEN t.Estado = 'Completada' THEN 1 ELSE 0 END) as TareasCompletadas,
+          SUM(CASE WHEN t.Prioridad = 'Alta' AND t.Estado != 'Completada' THEN 1 ELSE 0 END) as TareasAltaPrioridad,
+          MAX(t.FechaCreacion) as UltimaTareaCreada,
+          MAX(t.FechaFin) as ProximaFechaVencimiento
+        FROM PRI.Empleados e
+        INNER JOIN Tareas t ON e.DNI = t.Responsable
+        WHERE e.CargoID IN (4, 8) AND e.DNI != '44991089'
+        GROUP BY e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno
+        HAVING COUNT(t.Id) > 0
+        ORDER BY TareasPendientes DESC, TareasAltaPrioridad DESC, NombreCompleto
+      `);
+
+    res.json(result.recordset);
+  } catch (error) {
+    console.error('❌ Error obteniendo empleados con tareas:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
