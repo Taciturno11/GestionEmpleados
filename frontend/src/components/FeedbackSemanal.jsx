@@ -207,6 +207,12 @@ const FeedbackSemanal = ({ empleadoDNI }) => {
           </div>
           
           <div className="flex items-center space-x-3">
+            {feedback.ComentarioJefe && (
+              <div className="relative">
+                <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse"></div>
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-600 rounded-full"></div>
+              </div>
+            )}
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
               feedback.Estado === 'Borrador' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
               feedback.Estado === 'Enviado' ? 'bg-green-100 text-green-800 border border-green-200' :
@@ -305,6 +311,21 @@ const FeedbackSemanal = ({ empleadoDNI }) => {
               </div>
             </div>
             
+            {/* Comentario del jefe */}
+            {feedback.ComentarioJefe && (
+              <div className="mx-6 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-center mb-2">
+                  <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center mr-2">
+                    <span className="text-white text-sm">💬</span>
+                  </div>
+                  <h6 className="font-semibold text-amber-800">Comentario del Jefe</h6>
+                </div>
+                <p className="text-sm text-amber-700 leading-relaxed">
+                  {feedback.ComentarioJefe}
+                </p>
+              </div>
+            )}
+
             {/* Botones del modal */}
             <div className="flex items-center justify-between p-6 border-t border-slate-200 bg-slate-50 rounded-b-xl">
               <div className="flex items-center space-x-2">

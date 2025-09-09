@@ -5,6 +5,7 @@ import EmployeeCards from './components/EmployeeCards';
 import Sidebar from './components/Sidebar';
 import Calendar from './components/Calendar';
 import FeedbackSemanal from './components/FeedbackSemanal';
+import FeedbackEquipo from './components/FeedbackEquipo';
 
 // Configurar axios para usar rutas relativas
 const api = axios.create({
@@ -728,6 +729,11 @@ function App() {
           {/* Vista Calendario - Solo para jefe supremo */}
           {user.isSupremeBoss && vistaActiva === 'calendario' && (
             <Calendar tareas={tareas} empleados={empleados} />
+          )}
+
+          {/* Vista Feedback del Equipo - Solo para jefe supremo */}
+          {user.isSupremeBoss && vistaActiva === 'feedback-equipo' && (
+            <FeedbackEquipo />
           )}
 
           {/* Vista para trabajadores */}
