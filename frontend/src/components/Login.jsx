@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 
 const Login = ({ onLogin }) => {
   const [usuario, setUsuario] = useState('');
@@ -27,7 +27,7 @@ const Login = ({ onLogin }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
-      const response = await axios.post('/api/auth/login', { 
+      const response = await api.post('/auth/login', { 
         dni: usuario.trim(), 
         password: contrasena.trim() 
       });

@@ -5,6 +5,10 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0';
+const LOCAL_IP = process.env.LOCAL_IP || 'localhost';
+const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
+const API_BASE_URL = process.env.API_BASE_URL || `${SERVER_URL}/api`;
 
 // Middleware
 app.use(cors());
@@ -55,16 +59,16 @@ app.use('*', (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
-    app.listen(PORT, '0.0.0.0', () => {
+    app.listen(PORT, HOST, () => {
       console.log('🚀 Servidor corriendo en:');
       console.log('   📍 Local: http://localhost:' + PORT);
-      console.log('   🌐 Red: http://10.182.18.74:' + PORT);
+      console.log('   🌐 Red: ' + SERVER_URL);
       console.log('📊 API disponible en:');
       console.log('   📍 Local: http://localhost:' + PORT + '/api');
-      console.log('   🌐 Red: http://10.182.18.74:' + PORT + '/api');
-      console.log('🔐 Auth: http://10.182.18.74:' + PORT + '/api/auth');
-      console.log('💬 Feedback: http://10.182.18.74:' + PORT + '/api/feedback');
-      console.log('📋 Tareas: http://10.182.18.74:' + PORT + '/api/tareas');
+      console.log('   🌐 Red: ' + API_BASE_URL);
+      console.log('🔐 Auth: ' + API_BASE_URL + '/auth');
+      console.log('💬 Feedback: ' + API_BASE_URL + '/feedback');
+      console.log('📋 Tareas: ' + API_BASE_URL + '/tareas');
     });
   } catch (error) {
     console.error('❌ Error iniciando servidor:', error);

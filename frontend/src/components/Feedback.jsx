@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 
 const Feedback = () => {
   const [feedback, setFeedback] = useState([]);
@@ -29,7 +29,7 @@ const Feedback = () => {
     }
 
     try {
-      await axios.post('/api/feedback', nuevoFeedback);
+      await api.post('/feedback', nuevoFeedback);
       setNuevoFeedback({ tareaId: '', mensaje: '' });
       cargarFeedback();
     } catch (error) {

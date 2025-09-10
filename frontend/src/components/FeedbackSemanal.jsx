@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 
 const FeedbackSemanal = ({ empleadoDNI }) => {
   const [feedback, setFeedback] = useState({
@@ -15,14 +15,7 @@ const FeedbackSemanal = ({ empleadoDNI }) => {
   const [showModal, setShowModal] = useState(false);
   const [ultimaEdicion, setUltimaEdicion] = useState(null);
 
-  // Configurar axios
-  const api = axios.create({
-    baseURL: '/api',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    }
-  });
+  // Usar configuración centralizada de axios
 
   // Obtener semana actual (lunes a domingo)
   const obtenerSemanaActual = () => {

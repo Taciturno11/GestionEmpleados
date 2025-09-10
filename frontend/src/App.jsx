@@ -1,19 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from './config/axios';
+import { APP_CONFIG } from './config/api';
 import Login from './components/Login';
 import EmployeeCards from './components/EmployeeCards';
 import Sidebar from './components/Sidebar';
 import Calendar from './components/Calendar';
 import FeedbackSemanal from './components/FeedbackSemanal';
 import FeedbackEquipo from './components/FeedbackEquipo';
-
-// Configurar axios para usar rutas relativas
-const api = axios.create({
-  baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
 
 function App() {
   const [user, setUser] = useState(null);

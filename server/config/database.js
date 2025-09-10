@@ -3,7 +3,7 @@ const sql = require('mssql');
 const config = {
   user: process.env.DB_USER || 'anubis',
   password: process.env.DB_PASS || 'Tg7#kPz9@rLt2025',
-  server: process.env.DB_HOST || '172.16.248.48',
+  server: process.env.git || '172.16.248.48',
   port: parseInt(process.env.DB_PORT) || 1433,
   database: process.env.DB_NAME || 'Partner', 
   options: {
