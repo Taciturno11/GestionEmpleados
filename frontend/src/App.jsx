@@ -7,9 +7,9 @@ import Calendar from './components/Calendar';
 import FeedbackSemanal from './components/FeedbackSemanal';
 import FeedbackEquipo from './components/FeedbackEquipo';
 
-// Configurar axios para usar rutas relativas
+// Configurar axios para usar variables de entorno
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: `${import.meta.env.VITE_BACKEND_URL || 'http://10.8.2.56:3000'}/api`,
   headers: {
     'Content-Type': 'application/json'
   }

@@ -1,11 +1,20 @@
 const sql = require('mssql');
 
+// Debug: Mostrar variables de entorno de BD
+console.log('🔍 Variables de BD cargadas:', {
+  DB_HOST: process.env.DB_HOST,
+  DB_PORT: process.env.DB_PORT,
+  DB_USER: process.env.DB_USER,
+  DB_NAME: process.env.DB_NAME,
+  DB_PASS: process.env.DB_PASS ? 'Configurado' : 'No configurado'
+});
+
 const config = {
-  user: process.env.DB_USER || 'anubis',
-  password: process.env.DB_PASS || 'Tg7#kPz9@rLt2025',
-  server: process.env.DB_HOST || '172.16.248.48',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  server: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT) || 1433,
-  database: process.env.DB_NAME || 'Partner', 
+  database: process.env.DB_NAME, 
   options: {
     encrypt: false,
     trustServerCertificate: true,

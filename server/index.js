@@ -1,10 +1,19 @@
 const express = require('express');
 const cors = require('cors');
-const { connectDB } = require('./config/database');
 require('dotenv').config();
+const { connectDB } = require('./config/database');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
+
+// Debug: Mostrar variables de entorno
+console.log('🔍 Variables de entorno cargadas:', {
+  PORT: process.env.PORT,
+  DB_HOST: process.env.DB_HOST,
+  DB_USER: process.env.DB_USER,
+  DB_NAME: process.env.DB_NAME,
+  JWT_SECRET: process.env.JWT_SECRET ? 'Configurado' : 'No configurado'
+});
 
 // Middleware
 app.use(cors());

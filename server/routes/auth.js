@@ -3,7 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { connectDB } = require('../config/database');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura_2024';
+const JWT_SECRET = process.env.JWT_SECRET || 'holademar';
 
 // POST - Login
 router.post('/login', async (req, res) => {

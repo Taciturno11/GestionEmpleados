@@ -9,7 +9,7 @@ const FeedbackEquipo = () => {
 
   // Configurar axios
   const api = axios.create({
-    baseURL: '/api',
+    baseURL: `${import.meta.env.VITE_BACKEND_URL}/api`,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${localStorage.getItem('token')}`

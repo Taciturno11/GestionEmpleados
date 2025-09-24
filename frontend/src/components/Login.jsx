@@ -23,11 +23,18 @@ const Login = ({ onLogin }) => {
     setError('');
 
     try {
+      // Debug: Mostrar variables de entorno
+      console.log('🔍 Variables de entorno:', {
+        VITE_BACKEND_URL: import.meta.env.VITE_BACKEND_URL,
+        VITE_FRONTEND_HOST: import.meta.env.VITE_FRONTEND_HOST,
+        VITE_FRONTEND_PORT: import.meta.env.VITE_FRONTEND_PORT
+      });
+
       // Limpiar localStorage antes del login
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
-      const response = await axios.post('/api/auth/login', { 
+      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL || 'http://10.8.2.56:3000'}/api/auth/login`, { 
         dni: usuario.trim(), 
         password: contrasena.trim() 
       });
