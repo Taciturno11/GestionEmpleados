@@ -111,8 +111,19 @@ router.get('/', authenticateToken, async (req, res) => {
     const result = await request.query(query);
     
     // Separar tareas propias de las del equipo
+    // tareasPropias: tareas donde el usuario es el responsable (tareas que debe hacer)
+    // tareasEquipo: tareas de subordinados (tareas que deben hacer los subordinados)
     const tareasPropias = result.recordset.filter(tarea => tarea.Responsable === req.user.dni);
     const tareasEquipo = result.recordset.filter(tarea => tarea.Responsable !== req.user.dni);
+    
+    console.log('🔍 BACKEND - Separación de tareas:', {
+      usuario: req.user.dni,
+      totalTareas: result.recordset.length,
+      tareasPropias: tareasPropias.length,
+      tareasEquipo: tareasEquipo.length,
+      tareasPropiasDetalle: tareasPropias.map(t => ({ id: t.Id, titulo: t.Titulo, responsable: t.Responsable })),
+      tareasEquipoDetalle: tareasEquipo.map(t => ({ id: t.Id, titulo: t.Titulo, responsable: t.Responsable }))
+    });
     
     res.json({
       tareasPropias: tareasPropias,
@@ -210,6 +221,16 @@ router.post('/', authenticateToken, async (req, res) => {
     // Convertir fechas a formato ISO para evitar problemas de zona horaria
     const fechaInicioISO = new Date(fechaInicio + 'T00:00:00.000Z').toISOString();
     const fechaFinISO = new Date(fechaFin + 'T00:00:00.000Z').toISOString();
+    
+    console.log('🔍 BACKEND - Creando tarea:', {
+      titulo,
+      responsable,
+      creador: req.user.dni,
+      fechaInicio: fechaInicioISO,
+      fechaFin: fechaFinISO,
+      prioridad,
+      estado
+    });
 
     const result = await pool.request()
       .input('titulo', titulo)

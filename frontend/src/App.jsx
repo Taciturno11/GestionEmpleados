@@ -158,12 +158,9 @@ function App() {
           tareasPropias: response.data.tareasPropias?.length || 0,
           tareasEquipo: response.data.tareasEquipo?.length || 0,
           totalTareas: todasLasTareas.length,
-          primeraTarea: todasLasTareas[0] ? {
-            titulo: todasLasTareas[0].Titulo,
-            fechaInicio: todasLasTareas[0].FechaInicio,
-            fechaFin: todasLasTareas[0].FechaFin,
-            responsable: todasLasTareas[0].Responsable
-          } : null
+          vistaTareasActiva,
+          tareasPropiasDetalle: response.data.tareasPropias?.map(t => ({ id: t.Id, titulo: t.Titulo, responsable: t.Responsable })) || [],
+          tareasEquipoDetalle: response.data.tareasEquipo?.map(t => ({ id: t.Id, titulo: t.Titulo, responsable: t.Responsable })) || []
         });
         setSubordinados(response.data.subordinados || []);
         setNivelUsuario(response.data.nivelUsuario || 0);
@@ -290,10 +287,13 @@ function App() {
   const crearTarea = async (e) => {
     e.preventDefault();
     try {
-      const tareaData = user.isSupremeBoss ? nuevaTarea : {
-        ...nuevaTarea,
-        responsable: user.dni
-      };
+      const tareaData = nuevaTarea;
+      
+      console.log('🔍 FRONTEND - Creando tarea:', {
+        tareaData,
+        usuario: user.dni,
+        isSupremeBoss: user.isSupremeBoss
+      });
       
       await api.post('/tareas', tareaData);
       setNuevaTarea({
@@ -574,7 +574,9 @@ function App() {
   };
 
   // Función helper para renderizar filas de tareas
-  const renderTareaRow = (tarea, showResponsable = false) => (
+  const renderTareaRow = (tarea, showResponsable = false) => {
+    console.log('🔍 FRONTEND - Renderizando fila de tarea:', { id: tarea.Id, titulo: tarea.Titulo, responsable: tarea.Responsable, showResponsable });
+    return (
     <tr key={tarea.Id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 group transition-all duration-200 border-l-4 border-transparent hover:border-blue-400">
       <td className="px-4 py-3 w-48">
         <div>
@@ -650,7 +652,8 @@ function App() {
         </div>
       </td>
     </tr>
-  );
+    );
+  };
 
   const getPriorityColor = (prioridad) => {
     switch (prioridad) {
@@ -922,6 +925,8 @@ function App() {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {(() => {
+                            console.log('🔍 FRONTEND - Iniciando renderizado de tabla');
+                            
                             const tareasAMostrar = user.isSupremeBoss 
                               ? tareasEquipo 
                               : vistaTareasActiva === 'propias' 
@@ -930,7 +935,16 @@ function App() {
                             
                             const mostrarResponsable = user.isSupremeBoss || vistaTareasActiva === 'equipo';
                             
+                            console.log('🔍 FRONTEND - Renderizando tareas:', {
+                              vistaTareasActiva,
+                              userIsSupremeBoss: user.isSupremeBoss,
+                              tareasAMostrar: tareasAMostrar.length,
+                              tareasAMostrarDetalle: tareasAMostrar.map(t => ({ id: t.Id, titulo: t.Titulo, responsable: t.Responsable })),
+                              mostrarResponsable
+                            });
+                            
                             if (tareasAMostrar.length > 0) {
+                              console.log('🔍 FRONTEND - Mapeando tareas para renderizar:', tareasAMostrar.length);
                               return tareasAMostrar.map((tarea) => renderTareaRow(tarea, mostrarResponsable));
                             } else {
                               const colSpan = mostrarResponsable ? 7 : 6;
