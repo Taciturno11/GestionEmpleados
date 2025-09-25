@@ -142,11 +142,17 @@ router.put('/semanal/enviar', authenticateToken, async (req, res) => {
   }
 });
 
-// GET - Obtener feedback del equipo (solo para jefe supremo)
+// GET - Obtener feedback del equipo (para jefes con subordinados)
 router.get('/equipo', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.isSupremeBoss) {
-      return res.status(403).json({ error: 'Acceso denegado' });
+    const { obtenerNivelJerarquico, obtenerSubordinados } = require('../middleware/auth');
+    
+    // Obtener nivel jerárquico del usuario
+    const nivelUsuario = obtenerNivelJerarquico(req.user.cargoNombre, req.user.cargoId, req.user.campaniaId);
+    
+    // Solo permitir acceso si es jefe supremo o tiene subordinados
+    if (!req.user.isSupremeBoss && nivelUsuario >= 4) {
+      return res.status(403).json({ error: 'Acceso denegado. Solo jefes con subordinados pueden ver esta información.' });
     }
 
     const pool = await connectDB();
@@ -164,9 +170,12 @@ router.get('/equipo', authenticateToken, async (req, res) => {
       semanaInicio = lunes;
     }
 
-    const result = await pool.request()
-      .input('semanaInicio', semanaInicio.toISOString().split('T')[0])
-      .query(`
+    let query = '';
+    let subordinados = [];
+    
+    if (req.user.isSupremeBoss) {
+      // Jefe Supremo: ver feedback de TODOS los empleados
+      query = `
         SELECT 
           f.*,
           e.Nombres,
@@ -177,7 +186,45 @@ router.get('/equipo', authenticateToken, async (req, res) => {
         INNER JOIN PRI.Empleados e ON f.EmpleadoDNI = e.DNI
         WHERE f.SemanaInicio = @semanaInicio
         ORDER BY f.FechaEnvio DESC, e.Nombres
-      `);
+      `;
+    } else {
+      // Obtener subordinados según nivel jerárquico
+      subordinados = await obtenerSubordinados(req.user.dni, nivelUsuario, req.user.cargoId, req.user.campaniaId, pool);
+      
+      if (subordinados.length > 0) {
+        // Tiene subordinados: ver feedback de sus subordinados
+        const dnisSubordinados = subordinados.map(s => s.DNI);
+        const placeholders = dnisSubordinados.map((_, index) => `@dni${index}`).join(',');
+        
+        query = `
+          SELECT 
+            f.*,
+            e.Nombres,
+            e.ApellidoPaterno,
+            e.ApellidoMaterno,
+            LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreCompleto
+          FROM FeedbackSemanal f
+          INNER JOIN PRI.Empleados e ON f.EmpleadoDNI = e.DNI
+          WHERE f.SemanaInicio = @semanaInicio
+          AND f.EmpleadoDNI IN (${placeholders})
+          ORDER BY f.FechaEnvio DESC, e.Nombres
+        `;
+      } else {
+        // No tiene subordinados: retornar array vacío
+        return res.json([]);
+      }
+    }
+
+    const request = pool.request().input('semanaInicio', semanaInicio.toISOString().split('T')[0]);
+    
+    // Agregar parámetros para subordinados si es necesario
+    if (subordinados.length > 0 && !req.user.isSupremeBoss) {
+      subordinados.forEach((sub, index) => {
+        request.input(`dni${index}`, sub.DNI);
+      });
+    }
+    
+    const result = await request.query(query);
 
     res.json(result.recordset);
   } catch (error) {

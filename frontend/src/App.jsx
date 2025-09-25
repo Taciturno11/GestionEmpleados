@@ -19,6 +19,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [tareas, setTareas] = useState([]);
+  const [tareasPropias, setTareasPropias] = useState([]);
+  const [tareasEquipo, setTareasEquipo] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('tareas');
   const [showForm, setShowForm] = useState(false);
@@ -26,6 +28,10 @@ function App() {
   const [editingField, setEditingField] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [stats, setStats] = useState({});
+  const [subordinados, setSubordinados] = useState([]);
+  const [nivelUsuario, setNivelUsuario] = useState(0);
+  const [empleadosConTareas, setEmpleadosConTareas] = useState([]);
+  const [puedeVerDashboard, setPuedeVerDashboard] = useState(false);
   const [nuevaTarea, setNuevaTarea] = useState({
     titulo: '',
     responsable: '',
@@ -123,8 +129,8 @@ function App() {
         cargarStats()
       ];
       
-      // Solo cargar empleados si es jefe supremo
-      if (user?.isSupremeBoss) {
+      // Cargar empleados si puede ver dashboard (jefe supremo o tiene subordinados)
+      if (puedeVerDashboard) {
         promises.push(cargarEmpleados());
       }
       
@@ -144,7 +150,38 @@ function App() {
         url += `?empleado=${empleadoSeleccionado}`;
       }
       const response = await api.get(url);
-      setTareas(response.data);
+      
+      // Manejar nueva estructura de respuesta
+      if (response.data.tareasPropias !== undefined) {
+        setTareasPropias(response.data.tareasPropias || []);
+        setTareasEquipo(response.data.tareasEquipo || []);
+        setTareas([...response.data.tareasPropias, ...response.data.tareasEquipo]); // Para compatibilidad
+        setSubordinados(response.data.subordinados || []);
+        setNivelUsuario(response.data.nivelUsuario || 0);
+        
+        // Determinar si puede ver dashboard (tiene subordinados o es jefe supremo)
+        setPuedeVerDashboard(
+          user?.isSupremeBoss || 
+          (response.data.subordinados && response.data.subordinados.length > 0)
+        );
+      } else if (response.data.tareas) {
+        // Estructura anterior
+        setTareas(response.data.tareas);
+        setTareasPropias(response.data.tareas.filter(t => t.Responsable === user?.dni));
+        setTareasEquipo(response.data.tareas.filter(t => t.Responsable !== user?.dni));
+        setSubordinados(response.data.subordinados || []);
+        setNivelUsuario(response.data.nivelUsuario || 0);
+        
+        setPuedeVerDashboard(
+          user?.isSupremeBoss || 
+          (response.data.subordinados && response.data.subordinados.length > 0)
+        );
+      } else {
+        // Compatibilidad con estructura anterior
+        setTareas(response.data);
+        setTareasPropias(response.data.filter(t => t.Responsable === user?.dni));
+        setTareasEquipo(response.data.filter(t => t.Responsable !== user?.dni));
+      }
     } catch (error) {
       console.error('Error cargando tareas:', error);
     }
@@ -172,6 +209,7 @@ function App() {
     try {
       const response = await api.get('/tareas/empleados-con-tareas');
       setEmpleados(response.data);
+      setEmpleadosConTareas(response.data);
     } catch (error) {
       console.error('Error cargando empleados:', error);
     }
@@ -306,34 +344,89 @@ function App() {
     }
   };
 
-  const actualizarProgreso = async (tareaId, progreso) => {
-    try {
-      const progresoNum = parseInt(progreso);
-      
-      // Actualizar inmediatamente en el estado local para una experiencia fluida
-      setTareas(tareas.map(tarea => 
-        tarea.Id === tareaId 
-          ? { ...tarea, Progreso: progresoNum }
-          : tarea
-      ));
-      
-      // Enviar al servidor en segundo plano
-      const response = await api.put(`/tareas/${tareaId}/progreso`, {
-        progreso: progresoNum
+  // Debounce para actualizar progreso - solo envía al servidor cuando el usuario termine de mover
+  const [progresoTimeouts, setProgresoTimeouts] = useState({});
+
+  // Cleanup de timeouts cuando el componente se desmonte
+  useEffect(() => {
+    return () => {
+      // Limpiar todos los timeouts pendientes
+      Object.values(progresoTimeouts).forEach(timeoutId => {
+        if (timeoutId) clearTimeout(timeoutId);
       });
-      
-      if (response.status === 200) {
-        console.log('✅ Progreso actualizado:', response.data);
-      }
-    } catch (error) {
-      console.error('❌ Error actualizando progreso:', error);
-      // Revertir el cambio local si hay error
-      setTareas(tareas.map(tarea => 
-        tarea.Id === tareaId 
-          ? { ...tarea, Progreso: tarea.Progreso || 0 }
-          : tarea
-      ));
+    };
+  }, [progresoTimeouts]);
+
+  const actualizarProgreso = async (tareaId, progreso) => {
+    const progresoNum = parseInt(progreso);
+    
+    // Actualizar inmediatamente en el estado local para una experiencia fluida
+    setTareas(tareas.map(tarea => 
+      tarea.Id === tareaId 
+        ? { ...tarea, Progreso: progresoNum }
+        : tarea
+    ));
+
+    // También actualizar en tareasPropias y tareasEquipo si existen
+    setTareasPropias(prev => prev.map(tarea => 
+      tarea.Id === tareaId 
+        ? { ...tarea, Progreso: progresoNum }
+        : tarea
+    ));
+    setTareasEquipo(prev => prev.map(tarea => 
+      tarea.Id === tareaId 
+        ? { ...tarea, Progreso: progresoNum }
+        : tarea
+    ));
+    
+    // Cancelar timeout anterior si existe
+    if (progresoTimeouts[tareaId]) {
+      clearTimeout(progresoTimeouts[tareaId]);
     }
+    
+    // Crear nuevo timeout para enviar al servidor después de 500ms de inactividad
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await api.put(`/tareas/${tareaId}/progreso`, {
+          progreso: progresoNum
+        });
+        
+        if (response.status === 200) {
+          console.log('✅ Progreso actualizado en servidor:', response.data);
+        }
+      } catch (error) {
+        console.error('❌ Error actualizando progreso:', error);
+        // Revertir el cambio local si hay error
+        setTareas(tareas.map(tarea => 
+          tarea.Id === tareaId 
+            ? { ...tarea, Progreso: tarea.Progreso || 0 }
+            : tarea
+        ));
+        setTareasPropias(prev => prev.map(tarea => 
+          tarea.Id === tareaId 
+            ? { ...tarea, Progreso: tarea.Progreso || 0 }
+            : tarea
+        ));
+        setTareasEquipo(prev => prev.map(tarea => 
+          tarea.Id === tareaId 
+            ? { ...tarea, Progreso: tarea.Progreso || 0 }
+            : tarea
+        ));
+      }
+      
+      // Limpiar el timeout del estado
+      setProgresoTimeouts(prev => {
+        const newTimeouts = { ...prev };
+        delete newTimeouts[tareaId];
+        return newTimeouts;
+      });
+    }, 500);
+    
+    // Guardar el timeout en el estado
+    setProgresoTimeouts(prev => ({
+      ...prev,
+      [tareaId]: timeoutId
+    }));
   };
 
   const eliminarTarea = async (id) => {
@@ -460,6 +553,85 @@ function App() {
     });
   };
 
+  // Función helper para renderizar filas de tareas
+  const renderTareaRow = (tarea, showResponsable = false) => (
+    <tr key={tarea.Id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 group transition-all duration-200 border-l-4 border-transparent hover:border-blue-400">
+      <td className="px-4 py-3 w-48">
+        <div>
+          <div className="text-sm font-semibold text-slate-800 truncate">{tarea.Titulo}</div>
+          <div className="text-xs text-slate-500 truncate">{tarea.Descripcion}</div>
+        </div>
+      </td>
+      {showResponsable && (
+        <td className="px-3 py-3 w-32">
+          <div className="text-sm text-slate-700 truncate font-medium">{tarea.NombreResponsable}</div>
+        </td>
+      )}
+      <td className="px-3 py-3 w-24">
+        <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
+          tarea.Estado === 'Completada' ? 'bg-green-100 text-green-800 border border-green-200' :
+          tarea.Estado === 'En Progreso' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+          'bg-amber-100 text-amber-800 border border-amber-200'
+        }`}>
+          {tarea.Estado}
+        </span>
+      </td>
+      <td className="px-3 py-3 w-20">
+        <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
+          tarea.Prioridad === 'Alta' ? 'bg-red-100 text-red-800 border border-red-200' :
+          tarea.Prioridad === 'Media' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+          'bg-green-100 text-green-800 border border-green-200'
+        }`}>
+          {tarea.Prioridad}
+        </span>
+      </td>
+      <td className="px-4 py-3 w-32">
+        <div className="flex items-center space-x-2">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={tarea.Progreso || 0}
+            onChange={(e) => actualizarProgreso(tarea.Id, e.target.value)}
+            className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            style={{
+              background: `linear-gradient(to right, ${
+                (tarea.Progreso || 0) >= 80 ? '#10b981' :
+                (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
+                (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
+                '#ef4444'
+              } 0%, ${
+                (tarea.Progreso || 0) >= 80 ? '#10b981' :
+                (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
+                (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
+                '#ef4444'
+              } ${tarea.Progreso || 0}%, #e5e7eb ${tarea.Progreso || 0}%, #e5e7eb 100%)`
+            }}
+          />
+          <span className="text-xs font-medium text-gray-700 min-w-[2.5rem] text-center">
+            {tarea.Progreso || 0}%
+          </span>
+        </div>
+      </td>
+      <td className="px-3 py-3 w-28">
+        <div className="text-xs text-slate-600 space-y-1">
+          <div className="truncate font-medium">📅 {formatDate(tarea.FechaInicio)}</div>
+          <div className="truncate">⏰ {formatDate(tarea.FechaFin)}</div>
+        </div>
+      </td>
+      <td className="px-3 py-3 w-20">
+        <div className="flex space-x-1">
+          <button
+            onClick={() => eliminarTarea(tarea.Id)}
+            className="text-red-600 hover:text-red-800 text-xs font-medium"
+          >
+            🗑️
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
   const getPriorityColor = (prioridad) => {
     switch (prioridad) {
       case 'Alta': return 'bg-red-100 text-red-800 border-red-200';
@@ -484,11 +656,11 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Sidebar - Solo para jefe supremo */}
-      {user.isSupremeBoss && <Sidebar vistaActiva={vistaActiva} setVistaActiva={setVistaActiva} user={user} />}
+      {/* Sidebar - Para jefes con subordinados */}
+      {puedeVerDashboard && <Sidebar vistaActiva={vistaActiva} setVistaActiva={setVistaActiva} user={user} />}
 
       {/* Header */}
-      <div className={`bg-white shadow-sm border-b border-gray-200 ${user.isSupremeBoss ? 'ml-64' : ''}`}>
+      <div className={`bg-white shadow-sm border-b border-gray-200 ${puedeVerDashboard ? 'ml-64' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
@@ -508,6 +680,7 @@ function App() {
                 <p className="text-gray-600 text-sm">
                   Panel de Administración - {user?.nombre || 'Usuario'}
                   {user?.isSupremeBoss && <span className="ml-2 text-blue-600 font-semibold">👑 Jefe Supremo</span>}
+                  {!user?.isSupremeBoss && puedeVerDashboard && <span className="ml-2 text-green-600 font-semibold">👥 Jefe de Equipo</span>}
                 </p>
               </div>
             </div>
@@ -543,16 +716,16 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${user.isSupremeBoss ? 'ml-64' : ''}`}>
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${puedeVerDashboard ? 'ml-64' : ''}`}>
 
         {/* Content */}
         <div>
-          {/* Vista Dashboard - Solo para jefe supremo */}
-          {user.isSupremeBoss && vistaActiva === 'dashboard' && (
+          {/* Vista Dashboard - Para jefes con subordinados */}
+          {puedeVerDashboard && vistaActiva === 'dashboard' && (
             <>
               {/* Employee Cards */}
               <EmployeeCards 
-                empleados={empleados}
+                empleados={empleadosConTareas}
                 onSelectEmpleado={seleccionarEmpleado}
                 empleadoSeleccionado={empleadoSeleccionado}
                 tareas={tareas}
@@ -564,7 +737,7 @@ function App() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <span className="text-blue-600 font-medium">
-                      📋 Mostrando tareas de: {empleados.find(e => e.DNI === empleadoSeleccionado)?.NombreCompleto}
+                      📋 Mostrando tareas de: {empleadosConTareas.find(e => e.DNI === empleadoSeleccionado)?.NombreCompleto}
                     </span>
                   </div>
             <button 
@@ -583,161 +756,302 @@ function App() {
               {/* Tasks Table - Pizarra Moderna */}
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg border border-slate-200 overflow-hidden">
                 <div className="px-6 py-5 bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-300">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                      </div>
+                      <h3 className="text-xl font-bold text-white">📋 Gestión de Tareas</h3>
                     </div>
-                    <h3 className="text-xl font-bold text-white">📋 Historial de Tareas</h3>
+                    <button 
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                      onClick={() => {
+                        setShowForm(!showForm);
+                        if (!showForm && user) {
+                          setNuevaTarea(prev => ({
+                            ...prev,
+                            responsable: user.dni
+                          }));
+                        }
+                      }}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Nueva Tarea</span>
+                    </button>
                   </div>
                 </div>
-                <div className="overflow-x-auto bg-white">
-                  <table className="w-full">
-                    <thead className="bg-gradient-to-r from-slate-100 to-slate-200">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-48">
-                          📝 Tarea
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-32">
-                          👤 Responsable
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
-                          📊 Estado
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-20">
-                          ⚡ Prioridad
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-32">
-                          📈 Progreso
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-28">
-                          📅 Fechas
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-24">
-                          💬 Chat
-                        </th>
-                        <th className="px-3 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider w-20">
-                          ⚙️ Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
-                      {tareas.map((tarea) => (
-                        <tr key={tarea.Id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 group transition-all duration-200 border-l-4 border-transparent hover:border-blue-400">
-                          <td className="px-4 py-3 w-48">
-                            <div>
-                              <div className="text-sm font-semibold text-slate-800 truncate">{tarea.Titulo}</div>
-                              <div className="text-xs text-slate-500 truncate">{tarea.Descripcion}</div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 w-32">
-                            <div className="text-sm text-slate-700 truncate font-medium">{tarea.NombreResponsable}</div>
-                          </td>
-                          <td className="px-3 py-3 w-24">
-                            <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                              tarea.Estado === 'Completada' ? 'bg-green-100 text-green-800 border border-green-200' :
-                              tarea.Estado === 'En Progreso' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                              'bg-amber-100 text-amber-800 border border-amber-200'
-                            }`}>
-                              {tarea.Estado}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 w-20">
-                            <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${
-                              tarea.Prioridad === 'Alta' ? 'bg-red-100 text-red-800 border border-red-200' :
-                              tarea.Prioridad === 'Media' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                              'bg-green-100 text-green-800 border border-green-200'
-                            }`}>
-                              {tarea.Prioridad}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 w-32">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={tarea.Progreso || 0}
-                                onChange={(e) => actualizarProgreso(tarea.Id, e.target.value)}
-                                className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                                style={{
-                                  background: `linear-gradient(to right, ${
-                                    (tarea.Progreso || 0) >= 80 ? '#10b981' :
-                                    (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
-                                    (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
-                                    '#ef4444'
-                                  } 0%, ${
-                                    (tarea.Progreso || 0) >= 80 ? '#10b981' :
-                                    (tarea.Progreso || 0) >= 50 ? '#3b82f6' :
-                                    (tarea.Progreso || 0) >= 25 ? '#f59e0b' :
-                                    '#ef4444'
-                                  } ${tarea.Progreso || 0}%, #e5e7eb ${tarea.Progreso || 0}%, #e5e7eb 100%)`
-                                }}
-                              />
-                              <span className="text-xs font-medium text-gray-700 min-w-[2.5rem] text-center">
-                                {tarea.Progreso || 0}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 w-28">
-                            <div className="text-xs text-slate-600 space-y-1">
-                              <div className="truncate font-medium">📅 {formatDate(tarea.FechaInicio)}</div>
-                              <div className="truncate">⏰ {formatDate(tarea.FechaFin)}</div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 w-24">
-                            <button
-                              onClick={() => abrirChat(tarea.Id)}
-                              className="relative inline-flex items-center px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium transition-colors duration-200 border border-blue-200"
-                            >
-                              💬 Chat
-                              {tarea.MensajesNoLeidos > 0 && (
-                                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
-                                  {tarea.MensajesNoLeidos}
-                                </span>
-                              )}
-                            </button>
-                          </td>
-                          <td className="px-3 py-3 w-20">
-                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                              <button
-                                onClick={() => editarTarea(tarea)}
-                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-all duration-200"
-                                title="Editar tarea"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => eliminarTarea(tarea.Id)}
-                                className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-all duration-200"
-                                title="Eliminar tarea"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-        </div>
+                <div className="p-6 space-y-8">
+                  {/* Sección 1: Mis Tareas - Solo para jefes que no son supremos */}
+                  {!user.isSupremeBoss && (
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-bold text-blue-800">📋 Mis Tareas</h4>
+                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                            {tareasPropias.length} tareas
+                          </span>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-48">
+                                📝 Tarea
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-24">
+                                📊 Estado
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
+                                ⚡ Prioridad
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-32">
+                                📈 Progreso
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-28">
+                                📅 Fechas
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
+                                ⚙️ Acciones
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {tareasPropias.length > 0 ? tareasPropias.map((tarea) => renderTareaRow(tarea, false)) : (
+                              <tr>
+                                <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                                  <div className="flex flex-col items-center">
+                                    <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    <p>No tienes tareas asignadas</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sección 2: Tareas del Equipo */}
+                  {puedeVerDashboard && (
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                      <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-bold text-green-800">
+                            {user.isSupremeBoss ? '🏢 Todas las Tareas' : '👥 Tareas del Equipo'}
+                          </h4>
+                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                            {tareasEquipo.length} tareas
+                          </span>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-48">
+                                📝 Tarea
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-32">
+                                👤 Responsable
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-24">
+                                📊 Estado
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
+                                ⚡ Prioridad
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-32">
+                                📈 Progreso
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-28">
+                                📅 Fechas
+                              </th>
+                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
+                                ⚙️ Acciones
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {tareasEquipo.length > 0 ? tareasEquipo.map((tarea) => renderTareaRow(tarea, true)) : (
+                              <tr>
+                                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                                  <div className="flex flex-col items-center">
+                                    <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <p>{user.isSupremeBoss ? 'No hay tareas en el sistema' : 'No hay tareas del equipo'}</p>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Formulario de Nueva Tarea */}
+              {showForm && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+                  <form onSubmit={crearTarea} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Título
+                        </label>
+                        <input
+                          type="text"
+                          value={nuevaTarea.titulo}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, titulo: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Responsable
+                        </label>
+                        {(user.isSupremeBoss || subordinados.length > 0) ? (
+                          <select
+                            value={nuevaTarea.responsable}
+                            onChange={(e) => setNuevaTarea({...nuevaTarea, responsable: e.target.value})}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            required
+                          >
+                            <option value="">Seleccionar responsable</option>
+                            <option value={user.dni}>Yo mismo - {user.nombre}</option>
+                            {subordinados.map(subordinado => (
+                              <option key={subordinado.DNI} value={subordinado.DNI}>
+                                {subordinado.Nombres} {subordinado.ApellidoPaterno} - {subordinado.NombreCargo}
+                              </option>
+                            ))}
+                            {user.isSupremeBoss && usuarios.map(usuario => (
+                              <option key={usuario.DNI} value={usuario.DNI}>
+                                {usuario.Nombres} {usuario.ApellidoPaterno}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={user.nombre}
+                            disabled
+                            className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
+                          />
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Prioridad
+                        </label>
+                        <select
+                          value={nuevaTarea.prioridad}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, prioridad: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        >
+                          <option value="Alta">Alta</option>
+                          <option value="Media">Media</option>
+                          <option value="Baja">Baja</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Fecha de inicio
+                        </label>
+                        <input
+                          type="date"
+                          value={nuevaTarea.fechaInicio}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, fechaInicio: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Fecha de fin
+                        </label>
+                        <input
+                          type="date"
+                          value={nuevaTarea.fechaFin}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, fechaFin: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Estado
+                        </label>
+                        <select
+                          value={nuevaTarea.estado}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, estado: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        >
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="En Progreso">En Progreso</option>
+                          <option value="Terminado">Terminado</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowForm(false)}
+                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200 font-medium"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium"
+                      >
+                        Crear Tarea
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
             </>
           )}
 
-          {/* Vista Calendario - Solo para jefe supremo */}
-          {user.isSupremeBoss && vistaActiva === 'calendario' && (
-            <Calendar tareas={tareas} empleados={empleados} />
+          {/* Vista Calendario - Para jefes con subordinados */}
+          {puedeVerDashboard && vistaActiva === 'calendario' && (
+            <Calendar tareas={tareas} empleados={empleadosConTareas} />
           )}
 
-          {/* Vista Feedback del Equipo - Solo para jefe supremo */}
-          {user.isSupremeBoss && vistaActiva === 'feedback-equipo' && (
+          {/* Vista Feedback del Equipo - Para jefes con subordinados */}
+          {puedeVerDashboard && vistaActiva === 'feedback-equipo' && (
             <FeedbackEquipo />
           )}
 
-          {/* Vista para trabajadores */}
-          {!user.isSupremeBoss && (
+          {/* Vista para trabajadores sin subordinados */}
+          {!puedeVerDashboard && (
             <>
             {/* Task Management */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
@@ -800,7 +1114,7 @@ function App() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Responsable
                       </label>
-                      {user.isSupremeBoss ? (
+                      {(user.isSupremeBoss || subordinados.length > 0) ? (
                         <select
                           value={nuevaTarea.responsable}
                           onChange={(e) => setNuevaTarea({...nuevaTarea, responsable: e.target.value})}
@@ -808,7 +1122,13 @@ function App() {
                           required
                         >
                           <option value="">Seleccionar responsable</option>
-                          {usuarios.map(usuario => (
+                          <option value={user.dni}>Yo mismo - {user.nombre}</option>
+                          {subordinados.map(subordinado => (
+                            <option key={subordinado.DNI} value={subordinado.DNI}>
+                              {subordinado.Nombres} {subordinado.ApellidoPaterno} - {subordinado.NombreCargo}
+                            </option>
+                          ))}
+                          {user.isSupremeBoss && usuarios.map(usuario => (
                             <option key={usuario.DNI} value={usuario.DNI}>
                               {usuario.Nombres} {usuario.ApellidoPaterno}
                             </option>
@@ -1205,9 +1525,7 @@ function App() {
                 </div>
               </div>
             )}
-          </div>
-        
-
+        </div>
       </div>
     </div>
   );

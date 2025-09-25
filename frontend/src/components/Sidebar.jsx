@@ -4,7 +4,7 @@ const Sidebar = ({ vistaActiva, setVistaActiva, user }) => {
   const menuItems = [
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: user?.isSupremeBoss ? 'Dashboard General' : 'Mi Equipo',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
@@ -14,7 +14,7 @@ const Sidebar = ({ vistaActiva, setVistaActiva, user }) => {
     },
     {
       id: 'calendario',
-      label: 'Calendario',
+      label: user?.isSupremeBoss ? 'Calendario General' : 'Calendario del Equipo',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -23,7 +23,7 @@ const Sidebar = ({ vistaActiva, setVistaActiva, user }) => {
     },
     {
       id: 'feedback-equipo',
-      label: 'Feedback del Equipo',
+      label: user?.isSupremeBoss ? 'Feedback General' : 'Feedback del Equipo',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -63,7 +63,10 @@ const Sidebar = ({ vistaActiva, setVistaActiva, user }) => {
           </div>
           <div className="ml-3">
             <p className="text-sm font-medium text-gray-900">{user?.nombre || 'Usuario'}</p>
-            <p className="text-xs text-blue-600 font-semibold">👑 Jefe Supremo</p>
+            <p className="text-xs text-blue-600 font-semibold">
+              {user?.isSupremeBoss ? '👑 Jefe Supremo' : 
+               user?.cargoNombre ? `📋 ${user.cargoNombre}` : '👤 Usuario'}
+            </p>
           </div>
         </div>
       </div>

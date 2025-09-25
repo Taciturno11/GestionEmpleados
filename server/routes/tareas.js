@@ -1,17 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const { connectDB } = require('../config/database');
-const { authenticateToken, isSupremeBoss } = require('../middleware/auth');
+const { authenticateToken, isSupremeBoss, obtenerNivelJerarquico, obtenerSubordinados } = require('../middleware/auth');
 
-// GET - Obtener todas las tareas (con filtros según rol)
+// GET - Obtener todas las tareas (con filtros según jerarquía)
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const pool = await connectDB();
     const { empleado } = req.query;
+    
+    // Obtener nivel jerárquico del usuario
+    const nivelUsuario = obtenerNivelJerarquico(req.user.cargoNombre, req.user.cargoId, req.user.campaniaId);
+    
     let query = '';
-
+    let subordinados = [];
+    
+    console.log('🔍 BACKEND - Usuario:', {
+      dni: req.user.dni,
+      nombre: req.user.nombre,
+      cargoId: req.user.cargoId,
+      campaniaId: req.user.campaniaId,
+      cargoNombre: req.user.cargoNombre,
+      nivel: nivelUsuario,
+      isSupremeBoss: req.user.isSupremeBoss
+    });
+    
     if (req.user.isSupremeBoss) {
-      // Jefe supremo ve TODAS las tareas o filtradas por empleado
+      // Jefe Supremo: ve TODAS las tareas o filtradas por empleado
       if (empleado) {
         query = `
           SELECT 
@@ -37,30 +52,78 @@ router.get('/', authenticateToken, async (req, res) => {
         `;
       }
     } else {
-      // Trabajador ve SOLO sus tareas
-      query = `
-        SELECT 
-          t.*,
-          LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
-          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.EmisorDNI != @userDNI) as MensajesNoLeidos,
-          (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
-        FROM Tareas t
-        LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
-        WHERE t.Responsable = @userDNI
-        ORDER BY t.FechaCreacion DESC
-      `;
+      // Obtener subordinados según nivel jerárquico
+      subordinados = await obtenerSubordinados(req.user.dni, nivelUsuario, req.user.cargoId, req.user.campaniaId, pool);
+      
+      console.log('👥 BACKEND - Subordinados encontrados:', subordinados.length);
+      
+      if (subordinados.length > 0) {
+        // Tiene subordinados: ver tareas de subordinados + propias
+        const dnisSubordinados = subordinados.map(s => s.DNI);
+        const dnisParaBuscar = [req.user.dni, ...dnisSubordinados];
+        
+        // Crear placeholders para la consulta
+        const placeholders = dnisParaBuscar.map((_, index) => `@dni${index}`).join(',');
+        
+        query = `
+          SELECT 
+            t.*,
+            LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.EmisorDNI != @userDNI) as MensajesNoLeidos,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
+          FROM Tareas t
+          LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+          WHERE t.Responsable IN (${placeholders})
+          ORDER BY t.FechaCreacion DESC
+        `;
+      } else {
+        // No tiene subordinados: solo sus tareas
+        query = `
+          SELECT 
+            t.*,
+            LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreResponsable,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id AND m.Leido = 0 AND m.EmisorDNI != @userDNI) as MensajesNoLeidos,
+            (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
+          FROM Tareas t
+          LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+          WHERE t.Responsable = @userDNI
+          ORDER BY t.FechaCreacion DESC
+        `;
+      }
     }
 
-    const request = pool.request()
-      .input('userDNI', req.user.dni);
+    const request = pool.request().input('userDNI', req.user.dni);
     
     if (empleado) {
       request.input('empleadoDNI', empleado);
     }
     
+    // Agregar parámetros para subordinados si es necesario
+    if (subordinados.length > 0 && !req.user.isSupremeBoss) {
+      const dnisParaBuscar = [req.user.dni, ...subordinados.map(s => s.DNI)];
+      dnisParaBuscar.forEach((dni, index) => {
+        request.input(`dni${index}`, dni);
+      });
+    }
+    
     const result = await request.query(query);
     
-    res.json(result.recordset);
+    // Separar tareas propias de las del equipo
+    const tareasPropias = result.recordset.filter(tarea => tarea.Responsable === req.user.dni);
+    const tareasEquipo = result.recordset.filter(tarea => tarea.Responsable !== req.user.dni);
+    
+    res.json({
+      tareasPropias: tareasPropias,
+      tareasEquipo: tareasEquipo,
+      subordinados: subordinados,
+      nivelUsuario: nivelUsuario,
+      usuario: {
+        dni: req.user.dni,
+        nombre: req.user.nombre,
+        cargoNombre: req.user.cargoNombre,
+        nivel: nivelUsuario
+      }
+    });
   } catch (error) {
     console.error('❌ Error obteniendo tareas:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -121,15 +184,25 @@ router.post('/', authenticateToken, async (req, res) => {
     // Verificar que el responsable existe
     const userResult = await pool.request()
       .input('responsable', responsable)
-      .query('SELECT * FROM PRI.Empleados WHERE DNI = @responsable AND CargoID IN (4, 8)');
+      .query('SELECT * FROM PRI.Empleados WHERE DNI = @responsable AND EstadoEmpleado = \'Activo\'');
 
     if (userResult.recordset.length === 0) {
       return res.status(400).json({ error: 'Responsable no encontrado' });
     }
 
-    // Si no es jefe supremo, solo puede crear tareas para sí mismo
-    if (!req.user.isSupremeBoss && responsable !== req.user.dni) {
-      return res.status(403).json({ error: 'Solo puedes crear tareas para ti mismo' });
+    // Verificar permisos para asignar tareas
+    if (!req.user.isSupremeBoss) {
+      // Obtener nivel jerárquico del usuario
+      const nivelUsuario = obtenerNivelJerarquico(req.user.cargoNombre, req.user.cargoId, req.user.campaniaId);
+      
+      // Obtener subordinados del usuario
+      const subordinados = await obtenerSubordinados(req.user.dni, nivelUsuario, req.user.cargoId, req.user.campaniaId, pool);
+      const dnisSubordinados = subordinados.map(s => s.DNI);
+      
+      // Solo puede crear tareas para sí mismo o sus subordinados
+      if (responsable !== req.user.dni && !dnisSubordinados.includes(responsable)) {
+        return res.status(403).json({ error: 'Solo puedes crear tareas para ti mismo o tus subordinados directos' });
+      }
     }
 
     // Convertir fechas a formato ISO para evitar problemas de zona horaria
@@ -533,17 +606,20 @@ router.put('/:id/mensajes/leer', authenticateToken, async (req, res) => {
   }
 });
 
-// GET - Obtener empleados con tareas pendientes (solo para jefe supremo)
+// GET - Obtener empleados con tareas pendientes (para cualquier jefe con subordinados)
 router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.isSupremeBoss) {
-      return res.status(403).json({ error: 'Acceso denegado. Solo el jefe supremo puede ver esta información.' });
-    }
-
     const pool = await connectDB();
     
-    const result = await pool.request()
-      .query(`
+    // Obtener nivel jerárquico del usuario
+    const nivelUsuario = obtenerNivelJerarquico(req.user.cargoNombre, req.user.cargoId, req.user.campaniaId);
+    
+    let query = '';
+    let subordinados = [];
+    
+    if (req.user.isSupremeBoss) {
+      // Jefe Supremo: ver TODOS los empleados con tareas
+      query = `
         SELECT 
           e.DNI,
           LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreCompleto,
@@ -560,12 +636,59 @@ router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
           SUM(CASE WHEN t.Estado != 'Completada' AND t.FechaFin < GETDATE() THEN 1 ELSE 0 END) as TareasVencidas
         FROM PRI.Empleados e
         INNER JOIN Tareas t ON e.DNI = t.Responsable
-        WHERE e.CargoID IN (4, 8) AND e.DNI != '44991089'
+        WHERE e.EstadoEmpleado = 'Activo' AND e.DNI != '44991089'
         GROUP BY e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno
         HAVING COUNT(t.Id) > 0
         ORDER BY TareasPendientes DESC, TareasAltaPrioridad DESC, NombreCompleto
-      `);
+      `;
+    } else {
+      // Obtener subordinados según nivel jerárquico
+      subordinados = await obtenerSubordinados(req.user.dni, nivelUsuario, req.user.cargoId, req.user.campaniaId, pool);
+      
+      if (subordinados.length > 0) {
+        // Tiene subordinados: ver estadísticas de sus subordinados
+        const dnisSubordinados = subordinados.map(s => s.DNI);
+        const placeholders = dnisSubordinados.map((_, index) => `@dni${index}`).join(',');
+        
+        query = `
+          SELECT 
+            e.DNI,
+            LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as NombreCompleto,
+            e.Nombres,
+            e.ApellidoPaterno,
+            e.ApellidoMaterno,
+            COUNT(t.Id) as TotalTareas,
+            SUM(CASE WHEN t.Estado = 'Pendiente' THEN 1 ELSE 0 END) as TareasPendientes,
+            SUM(CASE WHEN t.Estado = 'En Progreso' THEN 1 ELSE 0 END) as TareasEnProgreso,
+            SUM(CASE WHEN t.Estado = 'Completada' THEN 1 ELSE 0 END) as TareasCompletadas,
+            SUM(CASE WHEN t.Prioridad = 'Alta' AND t.Estado != 'Completada' THEN 1 ELSE 0 END) as TareasAltaPrioridad,
+            MAX(t.FechaCreacion) as UltimaTareaCreada,
+            MIN(CASE WHEN t.Estado != 'Completada' THEN t.FechaFin END) as ProximaFechaVencimiento,
+            SUM(CASE WHEN t.Estado != 'Completada' AND t.FechaFin < GETDATE() THEN 1 ELSE 0 END) as TareasVencidas
+          FROM PRI.Empleados e
+          INNER JOIN Tareas t ON e.DNI = t.Responsable
+          WHERE e.DNI IN (${placeholders})
+          GROUP BY e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno
+          HAVING COUNT(t.Id) > 0
+          ORDER BY TareasPendientes DESC, TareasAltaPrioridad DESC, NombreCompleto
+        `;
+      } else {
+        // No tiene subordinados: retornar array vacío
+        return res.json([]);
+      }
+    }
 
+    const request = pool.request();
+    
+    // Agregar parámetros para subordinados si es necesario
+    if (subordinados.length > 0 && !req.user.isSupremeBoss) {
+      subordinados.forEach((sub, index) => {
+        request.input(`dni${index}`, sub.DNI);
+      });
+    }
+    
+    const result = await request.query(query);
+    
     res.json(result.recordset);
   } catch (error) {
     console.error('❌ Error obteniendo empleados con tareas:', error);
