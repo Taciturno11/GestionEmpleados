@@ -32,6 +32,7 @@ function App() {
   const [nivelUsuario, setNivelUsuario] = useState(0);
   const [empleadosConTareas, setEmpleadosConTareas] = useState([]);
   const [puedeVerDashboard, setPuedeVerDashboard] = useState(false);
+  const [vistaTareasActiva, setVistaTareasActiva] = useState('propias'); // 'propias' o 'equipo'
   const [nuevaTarea, setNuevaTarea] = useState({
     titulo: '',
     responsable: '',
@@ -757,14 +758,43 @@ function App() {
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg border border-slate-200 overflow-hidden">
                 <div className="px-6 py-5 bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-300">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                        </div>
+                        <h3 className="text-xl font-bold text-white">📋 Gestión de Tareas</h3>
                       </div>
-                      <h3 className="text-xl font-bold text-white">📋 Gestión de Tareas</h3>
+                      
+                      {/* Toggle para cambiar entre vistas */}
+                      {!user.isSupremeBoss && (
+                        <div className="flex bg-slate-600 rounded-lg p-1">
+                          <button
+                            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                              vistaTareasActiva === 'propias'
+                                ? 'bg-white text-slate-800 shadow-sm'
+                                : 'text-slate-200 hover:text-white'
+                            }`}
+                            onClick={() => setVistaTareasActiva('propias')}
+                          >
+                            📋 Mis Tareas
+                          </button>
+                          <button
+                            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                              vistaTareasActiva === 'equipo'
+                                ? 'bg-white text-slate-800 shadow-sm'
+                                : 'text-slate-200 hover:text-white'
+                            }`}
+                            onClick={() => setVistaTareasActiva('equipo')}
+                          >
+                            👥 Equipo
+                          </button>
+                        </div>
+                      )}
                     </div>
+                    
                     <button 
                       className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
                       onClick={() => {
@@ -784,129 +814,132 @@ function App() {
                     </button>
                   </div>
                 </div>
-                <div className="p-6 space-y-8">
-                  {/* Sección 1: Mis Tareas - Solo para jefes que no son supremos */}
-                  {!user.isSupremeBoss && (
-                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-6">
+                  {/* Vista única que cambia según el toggle */}
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div className="px-6 py-4 bg-gradient-to-r border-b border-gray-200" style={{
+                      background: user.isSupremeBoss 
+                        ? 'linear-gradient(to right, #f0f9ff, #e0f2fe)' 
+                        : vistaTareasActiva === 'propias' 
+                          ? 'linear-gradient(to right, #eff6ff, #dbeafe)' 
+                          : 'linear-gradient(to right, #f0fdf4, #dcfce7)'
+                    }}>
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          user.isSupremeBoss 
+                            ? 'bg-blue-500' 
+                            : vistaTareasActiva === 'propias' 
+                              ? 'bg-blue-500' 
+                              : 'bg-green-500'
+                        }`}>
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {user.isSupremeBoss ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            ) : vistaTareasActiva === 'propias' ? (
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                          </div>
-                          <h4 className="text-lg font-bold text-blue-800">📋 Mis Tareas</h4>
-                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                            {tareasPropias.length} tareas
-                          </span>
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-48">
-                                📝 Tarea
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-24">
-                                📊 Estado
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
-                                ⚡ Prioridad
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-32">
-                                📈 Progreso
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-28">
-                                📅 Fechas
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
-                                ⚙️ Acciones
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {tareasPropias.length > 0 ? tareasPropias.map((tarea) => renderTareaRow(tarea, false)) : (
-                              <tr>
-                                <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                                  <div className="flex flex-col items-center">
-                                    <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                    </svg>
-                                    <p>No tienes tareas asignadas</p>
-                                  </div>
-                                </td>
-                              </tr>
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             )}
-                          </tbody>
-                        </table>
+                          </svg>
+                        </div>
+                        <h4 className={`text-lg font-bold ${
+                          user.isSupremeBoss 
+                            ? 'text-blue-800' 
+                            : vistaTareasActiva === 'propias' 
+                              ? 'text-blue-800' 
+                              : 'text-green-800'
+                        }`}>
+                          {user.isSupremeBoss 
+                            ? '🏢 Todas las Tareas' 
+                            : vistaTareasActiva === 'propias' 
+                              ? '📋 Mis Tareas' 
+                              : '👥 Tareas del Equipo'
+                          }
+                        </h4>
+                        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
+                          user.isSupremeBoss 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : vistaTareasActiva === 'propias' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-green-100 text-green-800'
+                        }`}>
+                          {user.isSupremeBoss 
+                            ? `${tareasEquipo.length} tareas` 
+                            : vistaTareasActiva === 'propias' 
+                              ? `${tareasPropias.length} tareas` 
+                              : `${tareasEquipo.length} tareas`
+                          }
+                        </span>
                       </div>
                     </div>
-                  )}
-
-                  {/* Sección 2: Tareas del Equipo */}
-                  {puedeVerDashboard && (
-                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                          </div>
-                          <h4 className="text-lg font-bold text-green-800">
-                            {user.isSupremeBoss ? '🏢 Todas las Tareas' : '👥 Tareas del Equipo'}
-                          </h4>
-                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                            {tareasEquipo.length} tareas
-                          </span>
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-48">
-                                📝 Tarea
-                              </th>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-48">
+                              📝 Tarea
+                            </th>
+                            {(!user.isSupremeBoss && vistaTareasActiva === 'equipo') || user.isSupremeBoss ? (
                               <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-32">
                                 👤 Responsable
                               </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-24">
-                                📊 Estado
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
-                                ⚡ Prioridad
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-32">
-                                📈 Progreso
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-28">
-                                📅 Fechas
-                              </th>
-                              <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
-                                ⚙️ Acciones
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {tareasEquipo.length > 0 ? tareasEquipo.map((tarea) => renderTareaRow(tarea, true)) : (
-                              <tr>
-                                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                                  <div className="flex flex-col items-center">
-                                    <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                    <p>{user.isSupremeBoss ? 'No hay tareas en el sistema' : 'No hay tareas del equipo'}</p>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                            ) : null}
+                            <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-24">
+                              📊 Estado
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
+                              ⚡ Prioridad
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-32">
+                              📈 Progreso
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-28">
+                              📅 Fechas
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider w-20">
+                              ⚙️ Acciones
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {(() => {
+                            const tareasAMostrar = user.isSupremeBoss 
+                              ? tareasEquipo 
+                              : vistaTareasActiva === 'propias' 
+                                ? tareasPropias 
+                                : tareasEquipo;
+                            
+                            const mostrarResponsable = user.isSupremeBoss || vistaTareasActiva === 'equipo';
+                            
+                            if (tareasAMostrar.length > 0) {
+                              return tareasAMostrar.map((tarea) => renderTareaRow(tarea, mostrarResponsable));
+                            } else {
+                              const colSpan = mostrarResponsable ? 7 : 6;
+                              return (
+                                <tr>
+                                  <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
+                                    <div className="flex flex-col items-center">
+                                      <svg className="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                      </svg>
+                                      <p>
+                                        {user.isSupremeBoss 
+                                          ? 'No hay tareas en el sistema' 
+                                          : vistaTareasActiva === 'propias' 
+                                            ? 'No tienes tareas asignadas' 
+                                            : 'No hay tareas del equipo'
+                                        }
+                                      </p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+                          })()}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
