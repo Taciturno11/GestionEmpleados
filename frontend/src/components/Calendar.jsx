@@ -7,6 +7,26 @@ const Calendar = ({ tareas, empleados }) => {
   const [diaExpandido, setDiaExpandido] = useState(null);
   const [empleadoExpandido, setEmpleadoExpandido] = useState(null); // {dia: X, empleadoDNI: 'Y'}
 
+  // Debug: Log para ver las tareas que recibe el calendario
+  console.log('🔍 DEBUG Calendar - Tareas recibidas:', tareas.length, 'tareas');
+  console.log('🔍 DEBUG Calendar - Empleados recibidos:', empleados.length, 'empleados');
+  console.log('🔍 DEBUG Calendar - Fecha actual:', fechaActual.toDateString());
+  if (tareas.length > 0) {
+    console.log('🔍 DEBUG Calendar - Primera tarea:', {
+      titulo: tareas[0].Titulo,
+      fechaInicio: tareas[0].FechaInicio,
+      fechaFin: tareas[0].FechaFin,
+      responsable: tareas[0].Responsable
+    });
+    console.log('🔍 DEBUG Calendar - Todas las tareas:', tareas.map(t => ({
+      titulo: t.Titulo,
+      fechaInicio: t.FechaInicio,
+      fechaFin: t.FechaFin
+    })));
+  } else {
+    console.log('❌ DEBUG Calendar - NO HAY TAREAS');
+  }
+
   // Obtener el primer día del mes y el número de días
   const primerDiaMes = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
   const ultimoDiaMes = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0);
@@ -36,24 +56,49 @@ const Calendar = ({ tareas, empleados }) => {
     });
   };
 
-  // Función para obtener tareas de un día específico (corrige zona horaria)
+  // Función para obtener tareas de un día específico (LÓGICA CORREGIDA)
   const obtenerTareasDelDia = (dia) => {
-    const fecha = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), dia);
+    const año = fechaActual.getFullYear();
+    const mes = fechaActual.getMonth() + 1; // getMonth() devuelve 0-11, necesitamos 1-12
+    
     return tareas.filter(tarea => {
-      // Corregir zona horaria en las fechas de las tareas
-      let fechaInicioStr = tarea.FechaInicio;
-      let fechaFinStr = tarea.FechaFin;
+      const fechaInicioStr = tarea.FechaInicio;
+      const fechaFinStr = tarea.FechaFin;
       
-      if (fechaInicioStr && fechaInicioStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        fechaInicioStr = fechaInicioStr + 'T00:00:00';
-      }
-      if (fechaFinStr && fechaFinStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        fechaFinStr = fechaFinStr + 'T00:00:00';
-      }
+      if (!fechaInicioStr || !fechaFinStr) return false;
       
+      // Convertir fechas ISO a formato YYYY-MM-DD
       const fechaInicio = new Date(fechaInicioStr);
       const fechaFin = new Date(fechaFinStr);
-      return fecha >= fechaInicio && fecha <= fechaFin;
+      
+      const añoInicio = fechaInicio.getFullYear();
+      const mesInicio = fechaInicio.getMonth() + 1;
+      const diaInicio = fechaInicio.getDate();
+      
+      const añoFin = fechaFin.getFullYear();
+      const mesFin = fechaFin.getMonth() + 1;
+      const diaFin = fechaFin.getDate();
+      
+      // LÓGICA ULTRA SIMPLE: Verificar si el día actual está dentro del rango
+      const estaEnRango = (año === añoInicio && mes === mesInicio && dia >= diaInicio && dia <= diaFin);
+      
+      // Debug: Log para entender qué está pasando
+      if (dia >= 24 && dia <= 28) { // Log para los días relevantes
+        console.log('🔍 DEBUG Calendario ULTRA SIMPLE:', {
+          dia,
+          año,
+          mes,
+          tarea: tarea.Titulo,
+          fechaInicioStr,
+          fechaFinStr,
+          añoInicio, mesInicio, diaInicio,
+          añoFin, mesFin, diaFin,
+          estaEnRango,
+          CONDICION: `Año: ${año} === ${añoInicio} && Mes: ${mes} === ${mesInicio} && Dia: ${dia} >= ${diaInicio} && ${dia} <= ${diaFin}`
+        });
+      }
+      
+      return estaEnRango;
     });
   };
 
@@ -73,25 +118,29 @@ const Calendar = ({ tareas, empleados }) => {
     return agrupadas;
   };
 
-  // Calcular estadísticas del mes
+  // Calcular estadísticas del mes (lógica ULTRA SIMPLE)
   const calcularEstadisticas = () => {
+    const año = fechaActual.getFullYear();
+    const mes = fechaActual.getMonth() + 1; // getMonth() devuelve 0-11, necesitamos 1-12
+    
     const tareasDelMes = tareas.filter(tarea => {
-      let fechaInicioStr = tarea.FechaInicio;
-      let fechaFinStr = tarea.FechaFin;
+      const fechaInicioStr = tarea.FechaInicio;
+      const fechaFinStr = tarea.FechaFin;
       
-      if (fechaInicioStr && fechaInicioStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        fechaInicioStr = fechaInicioStr + 'T00:00:00';
-      }
-      if (fechaFinStr && fechaFinStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        fechaFinStr = fechaFinStr + 'T00:00:00';
-      }
+      if (!fechaInicioStr || !fechaFinStr) return false;
       
+      // Convertir fechas ISO a formato YYYY-MM-DD
       const fechaInicio = new Date(fechaInicioStr);
       const fechaFin = new Date(fechaFinStr);
-      const primerDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
-      const ultimoDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0);
       
-      return (fechaInicio <= ultimoDia && fechaFin >= primerDia);
+      const añoInicio = fechaInicio.getFullYear();
+      const mesInicio = fechaInicio.getMonth() + 1;
+      const añoFin = fechaFin.getFullYear();
+      const mesFin = fechaFin.getMonth() + 1;
+      
+      // Verificar si la tarea se superpone con el mes actual
+      return (añoInicio < año || (añoInicio === año && mesInicio <= mes)) &&
+             (añoFin > año || (añoFin === año && mesFin >= mes));
     });
 
     return {
@@ -175,6 +224,12 @@ const Calendar = ({ tareas, empleados }) => {
                 className="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all duration-200 hover:scale-105 font-medium"
               >
                 📅 Hoy
+              </button>
+              <button
+                onClick={() => setFechaActual(new Date(2025, 8, 1))} // Septiembre 2025 (mes 8 porque es 0-indexado)
+                className="px-4 py-2 bg-green-500/80 text-white rounded-lg hover:bg-green-500 transition-all duration-200 hover:scale-105 font-medium"
+              >
+                🎯 Sep 2025
               </button>
               <button
                 onClick={mesSiguiente}

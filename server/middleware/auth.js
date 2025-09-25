@@ -44,15 +44,27 @@ const obtenerSubordinados = async (dni, nivel, cargoId, campaniaId, pool) => {
       AND e.EstadoEmpleado = 'Activo'
     `;
   } else if (nivel === 1) {
-    // Jefe de Área: buscar coordinadores
-    query = `
-      SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
-      FROM PRI.Empleados e
-      LEFT JOIN PRI.Cargos c ON c.CargoID = e.CargoID
-      WHERE e.JefeDNI = @dni 
-      AND e.EstadoEmpleado = 'Activo'
-      AND c.NombreCargo LIKE '%coordinador%'
-    `;
+    // Jefe de Área: buscar coordinadores O empleados de sus campañas específicas
+    if (dni === '76157106') {
+      // Jefa específica: buscar empleados de Capacitación (11) y Calidad (10)
+      query = `
+        SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
+        FROM PRI.Empleados e
+        LEFT JOIN PRI.Cargos c ON c.CargoID = e.CargoID
+        WHERE e.EstadoEmpleado = 'Activo'
+        AND e.CampañaID IN (10, 11)
+      `;
+    } else {
+      // Otros jefes de área: buscar coordinadores
+      query = `
+        SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
+        FROM PRI.Empleados e
+        LEFT JOIN PRI.Cargos c ON c.CargoID = e.CargoID
+        WHERE e.JefeDNI = @dni 
+        AND e.EstadoEmpleado = 'Activo'
+        AND c.NombreCargo LIKE '%coordinador%'
+      `;
+    }
   } else if (nivel === 2) {
     // Coordinador: buscar supervisores
     query = `

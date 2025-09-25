@@ -26,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
     });
     
     if (req.user.isSupremeBoss) {
-      // Jefe Supremo: ve TODAS las tareas o filtradas por empleado
+      // Jefe Supremo: ve SOLO tareas de subjefes (jefes de área + analistas)
       if (empleado) {
         query = `
           SELECT 
@@ -37,6 +37,7 @@ router.get('/', authenticateToken, async (req, res) => {
           FROM Tareas t
           LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
           WHERE t.Responsable = @empleadoDNI
+          AND (e.DNI IN ('002702515', '76157106', '46142691') OR (e.CargoID = 4 AND e.CampañaID = 5))
           ORDER BY t.FechaCreacion DESC
         `;
       } else {
@@ -48,6 +49,7 @@ router.get('/', authenticateToken, async (req, res) => {
             (SELECT COUNT(*) FROM MensajesObservaciones m WHERE m.TareaId = t.Id) as TotalMensajes
           FROM Tareas t
           LEFT JOIN PRI.Empleados e ON t.Responsable = e.DNI
+          WHERE (e.DNI IN ('002702515', '76157106', '46142691') OR (e.CargoID = 4 AND e.CampañaID = 5))
           ORDER BY t.FechaCreacion DESC
         `;
       }
@@ -618,7 +620,7 @@ router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
     let subordinados = [];
     
     if (req.user.isSupremeBoss) {
-      // Jefe Supremo: ver TODOS los empleados con tareas
+      // Jefe Supremo: ver SOLO los subjefes (jefes de área + analistas)
       query = `
         SELECT 
           e.DNI,
@@ -636,14 +638,20 @@ router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
           SUM(CASE WHEN t.Estado != 'Completada' AND t.FechaFin < GETDATE() THEN 1 ELSE 0 END) as TareasVencidas
         FROM PRI.Empleados e
         INNER JOIN Tareas t ON e.DNI = t.Responsable
-        WHERE e.EstadoEmpleado = 'Activo' AND e.DNI != '44991089'
+        WHERE e.EstadoEmpleado = 'Activo' 
+        AND e.DNI != '44991089'
+        AND (e.DNI IN ('002702515', '76157106', '46142691') OR (e.CargoID = 4 AND e.CampañaID = 5))
         GROUP BY e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno
         HAVING COUNT(t.Id) > 0
         ORDER BY TareasPendientes DESC, TareasAltaPrioridad DESC, NombreCompleto
-      `;
+`;
     } else {
       // Obtener subordinados según nivel jerárquico
       subordinados = await obtenerSubordinados(req.user.dni, nivelUsuario, req.user.cargoId, req.user.campaniaId, pool);
+      
+      console.log('🔍 DEBUG - Usuario:', req.user.dni, 'Nivel:', nivelUsuario);
+      console.log('🔍 DEBUG - Subordinados encontrados:', subordinados.length);
+      console.log('🔍 DEBUG - Subordinados:', subordinados.map(s => ({ DNI: s.DNI, Nombre: s.Nombres })));
       
       if (subordinados.length > 0) {
         // Tiene subordinados: ver estadísticas de sus subordinados
@@ -672,6 +680,10 @@ router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
           HAVING COUNT(t.Id) > 0
           ORDER BY TareasPendientes DESC, TareasAltaPrioridad DESC, NombreCompleto
         `;
+        
+        console.log('🔍 DEBUG - Query empleados con tareas:', query);
+        console.log('🔍 DEBUG - Placeholders:', placeholders);
+        console.log('🔍 DEBUG - DNIs subordinados:', dnisSubordinados);
       } else {
         // No tiene subordinados: retornar array vacío
         return res.json([]);
@@ -688,6 +700,9 @@ router.get('/empleados-con-tareas', authenticateToken, async (req, res) => {
     }
     
     const result = await request.query(query);
+    
+    console.log('🔍 DEBUG - Resultado empleados con tareas:', result.recordset.length, 'empleados');
+    console.log('🔍 DEBUG - Empleados encontrados:', result.recordset.map(e => ({ DNI: e.DNI, Nombre: e.NombreCompleto, Tareas: e.TotalTareas })));
     
     res.json(result.recordset);
   } catch (error) {

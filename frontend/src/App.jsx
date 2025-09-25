@@ -130,11 +130,6 @@ function App() {
         cargarStats()
       ];
       
-      // Cargar empleados si puede ver dashboard (jefe supremo o tiene subordinados)
-      if (puedeVerDashboard) {
-        promises.push(cargarEmpleados());
-      }
-      
       await Promise.all(promises);
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -156,15 +151,32 @@ function App() {
       if (response.data.tareasPropias !== undefined) {
         setTareasPropias(response.data.tareasPropias || []);
         setTareasEquipo(response.data.tareasEquipo || []);
-        setTareas([...response.data.tareasPropias, ...response.data.tareasEquipo]); // Para compatibilidad
+        const todasLasTareas = [...response.data.tareasPropias, ...response.data.tareasEquipo];
+        setTareas(todasLasTareas); // Para compatibilidad
+        
+        console.log('🔍 FRONTEND - Tareas cargadas:', {
+          tareasPropias: response.data.tareasPropias?.length || 0,
+          tareasEquipo: response.data.tareasEquipo?.length || 0,
+          totalTareas: todasLasTareas.length,
+          primeraTarea: todasLasTareas[0] ? {
+            titulo: todasLasTareas[0].Titulo,
+            fechaInicio: todasLasTareas[0].FechaInicio,
+            fechaFin: todasLasTareas[0].FechaFin,
+            responsable: todasLasTareas[0].Responsable
+          } : null
+        });
         setSubordinados(response.data.subordinados || []);
         setNivelUsuario(response.data.nivelUsuario || 0);
         
         // Determinar si puede ver dashboard (tiene subordinados o es jefe supremo)
-        setPuedeVerDashboard(
-          user?.isSupremeBoss || 
-          (response.data.subordinados && response.data.subordinados.length > 0)
-        );
+        const puedeVer = user?.isSupremeBoss || 
+          (response.data.subordinados && response.data.subordinados.length > 0);
+        setPuedeVerDashboard(puedeVer);
+        
+        // Cargar empleados si puede ver dashboard
+        if (puedeVer) {
+          cargarEmpleados();
+        }
       } else if (response.data.tareas) {
         // Estructura anterior
         setTareas(response.data.tareas);
@@ -173,10 +185,14 @@ function App() {
         setSubordinados(response.data.subordinados || []);
         setNivelUsuario(response.data.nivelUsuario || 0);
         
-        setPuedeVerDashboard(
-          user?.isSupremeBoss || 
-          (response.data.subordinados && response.data.subordinados.length > 0)
-        );
+        const puedeVer = user?.isSupremeBoss || 
+          (response.data.subordinados && response.data.subordinados.length > 0);
+        setPuedeVerDashboard(puedeVer);
+        
+        // Cargar empleados si puede ver dashboard
+        if (puedeVer) {
+          cargarEmpleados();
+        }
       } else {
         // Compatibilidad con estructura anterior
         setTareas(response.data);
@@ -208,11 +224,14 @@ function App() {
 
   const cargarEmpleados = async () => {
     try {
+      console.log('🔍 FRONTEND - Cargando empleados con tareas...');
       const response = await api.get('/tareas/empleados-con-tareas');
+      console.log('🔍 FRONTEND - Empleados recibidos:', response.data.length, 'empleados');
+      console.log('🔍 FRONTEND - Empleados:', response.data.map(e => ({ DNI: e.DNI, Nombre: e.NombreCompleto, Tareas: e.TotalTareas })));
       setEmpleados(response.data);
       setEmpleadosConTareas(response.data);
     } catch (error) {
-      console.error('Error cargando empleados:', error);
+      console.error('❌ FRONTEND - Error cargando empleados:', error);
     }
   };
 
