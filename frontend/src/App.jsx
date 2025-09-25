@@ -1094,7 +1094,7 @@ function App() {
 
           {/* Vista Calendario - Para jefes con subordinados */}
           {puedeVerDashboard && vistaActiva === 'calendario' && (
-            <Calendar tareas={tareas} empleados={empleadosConTareas} />
+            <Calendar tareas={tareas} empleados={empleados} />
           )}
 
           {/* Vista Feedback del Equipo - Para jefes con subordinados */}

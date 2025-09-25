@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 const Calendar = ({ tareas, empleados }) => {
+  console.log('🚀 CALENDAR COMPONENT RENDERIZANDO - Props recibidas:', { tareas: tareas?.length, empleados: empleados?.length });
+  
   const [fechaActual, setFechaActual] = useState(new Date());
   const [vistaMes, setVistaMes] = useState(true);
   const [tareaSeleccionada, setTareaSeleccionada] = useState(null);
@@ -11,6 +13,7 @@ const Calendar = ({ tareas, empleados }) => {
   console.log('🔍 DEBUG Calendar - Tareas recibidas:', tareas.length, 'tareas');
   console.log('🔍 DEBUG Calendar - Empleados recibidos:', empleados.length, 'empleados');
   console.log('🔍 DEBUG Calendar - Fecha actual:', fechaActual.toDateString());
+  console.log('🔍 DEBUG Calendar - Mes actual:', fechaActual.getMonth() + 1, 'Año actual:', fechaActual.getFullYear());
   if (tareas.length > 0) {
     console.log('🔍 DEBUG Calendar - Primera tarea:', {
       titulo: tareas[0].Titulo,
@@ -67,30 +70,32 @@ const Calendar = ({ tareas, empleados }) => {
       
       if (!fechaInicioStr || !fechaFinStr) return false;
       
-      // Convertir fechas ISO a formato YYYY-MM-DD
-      const fechaInicio = new Date(fechaInicioStr);
-      const fechaFin = new Date(fechaFinStr);
+      // Extraer fecha directamente del string ISO (SIN conversión a Date)
+      const fechaInicioPartes = fechaInicioStr.split('T')[0].split('-');
+      const fechaFinPartes = fechaFinStr.split('T')[0].split('-');
       
-      const añoInicio = fechaInicio.getFullYear();
-      const mesInicio = fechaInicio.getMonth() + 1;
-      const diaInicio = fechaInicio.getDate();
+      const añoInicio = parseInt(fechaInicioPartes[0]);
+      const mesInicio = parseInt(fechaInicioPartes[1]);
+      const diaInicio = parseInt(fechaInicioPartes[2]);
       
-      const añoFin = fechaFin.getFullYear();
-      const mesFin = fechaFin.getMonth() + 1;
-      const diaFin = fechaFin.getDate();
+      const añoFin = parseInt(fechaFinPartes[0]);
+      const mesFin = parseInt(fechaFinPartes[1]);
+      const diaFin = parseInt(fechaFinPartes[2]);
       
       // LÓGICA ULTRA SIMPLE: Verificar si el día actual está dentro del rango
       const estaEnRango = (año === añoInicio && mes === mesInicio && dia >= diaInicio && dia <= diaFin);
       
       // Debug: Log para entender qué está pasando
       if (dia >= 24 && dia <= 28) { // Log para los días relevantes
-        console.log('🔍 DEBUG Calendario ULTRA SIMPLE:', {
+        console.log('🔍 DEBUG Calendario CORREGIDO:', {
           dia,
           año,
           mes,
           tarea: tarea.Titulo,
           fechaInicioStr,
           fechaFinStr,
+          fechaInicioPartes,
+          fechaFinPartes,
           añoInicio, mesInicio, diaInicio,
           añoFin, mesFin, diaFin,
           estaEnRango,
