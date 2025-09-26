@@ -33,10 +33,19 @@ function App() {
   const [empleadosConTareas, setEmpleadosConTareas] = useState([]);
   const [puedeVerDashboard, setPuedeVerDashboard] = useState(false);
   const [vistaTareasActiva, setVistaTareasActiva] = useState('propias'); // 'propias' o 'equipo'
+  // Función helper para obtener la fecha local en formato YYYY-MM-DD
+  const getCurrentDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [nuevaTarea, setNuevaTarea] = useState({
     titulo: '',
     responsable: '',
-    fechaInicio: new Date().toISOString().split('T')[0],
+    fechaInicio: getCurrentDate(),
     fechaFin: '',
     prioridad: 'Media',
     estado: 'Pendiente',
@@ -299,7 +308,7 @@ function App() {
       setNuevaTarea({
         titulo: '',
         responsable: user?.dni || '',
-        fechaInicio: new Date().toISOString().split('T')[0],
+        fechaInicio: getCurrentDate(),
         fechaFin: '',
         prioridad: 'Media',
         estado: 'Pendiente',

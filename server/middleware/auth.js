@@ -35,7 +35,7 @@ const obtenerSubordinados = async (dni, nivel, cargoId, campaniaId, pool) => {
   let query = '';
   
   if (nivel === 0) {
-    // Jefe Supremo: buscar jefes de área + analistas
+    // Jefe Supremo: buscar los 3 jefes de área + analistas
     query = `
       SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
       FROM PRI.Empleados e
@@ -44,9 +44,10 @@ const obtenerSubordinados = async (dni, nivel, cargoId, campaniaId, pool) => {
       AND e.EstadoEmpleado = 'Activo'
     `;
   } else if (nivel === 1) {
-    // Jefe de Área: buscar coordinadores O empleados de sus campañas específicas
+    // Solo hay 3 jefes de área + analistas en nivel 1
     if (dni === '76157106') {
-      // Jefa específica: buscar empleados de Capacitación (11) y Calidad (10)
+      // Jefa de Capacitación/Calidad: buscar empleados de sus campañas específicas
+      console.log('🔍 Jefa de Capacitación/Calidad, buscando empleados de campañas 10 y 11');
       query = `
         SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
         FROM PRI.Empleados e
@@ -54,8 +55,20 @@ const obtenerSubordinados = async (dni, nivel, cargoId, campaniaId, pool) => {
         WHERE e.EstadoEmpleado = 'Activo'
         AND e.CampañaID IN (10, 11)
       `;
-    } else {
-      // Otros jefes de área: buscar coordinadores
+    } else if (dni === '002702515') {
+      // Jefe específico: buscar supervisores directamente (sin coordinadores)
+      console.log('🔍 Jefe 002702515, buscando supervisores directamente');
+      query = `
+        SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
+        FROM PRI.Empleados e
+        LEFT JOIN PRI.Cargos c ON c.CargoID = e.CargoID
+        WHERE e.JefeDNI = @dni 
+        AND e.EstadoEmpleado = 'Activo'
+        AND c.NombreCargo LIKE '%supervisor%'
+      `;
+    } else if (dni === '46142691') {
+      // Tercer jefe: buscar coordinadores primero, luego supervisores si no hay coordinadores
+      console.log('🔍 Tercer jefe 46142691, buscando coordinadores primero');
       query = `
         SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
         FROM PRI.Empleados e
@@ -64,6 +77,33 @@ const obtenerSubordinados = async (dni, nivel, cargoId, campaniaId, pool) => {
         AND e.EstadoEmpleado = 'Activo'
         AND c.NombreCargo LIKE '%coordinador%'
       `;
+      
+      // Ejecutar consulta de coordinadores
+      const result = await pool.request().input('dni', dni).query(query);
+      
+      if (result.recordset.length > 0) {
+        console.log('✅ Coordinadores encontrados para jefe 46142691:', result.recordset.length);
+        return result.recordset;
+      } else {
+        // Si no hay coordinadores, buscar supervisores directamente
+        console.log('⚠️ No se encontraron coordinadores, buscando supervisores directamente para jefe 46142691');
+        query = `
+          SELECT e.DNI, e.Nombres, e.ApellidoPaterno, e.ApellidoMaterno, e.CargoID, e.CampañaID, c.NombreCargo
+          FROM PRI.Empleados e
+          LEFT JOIN PRI.Cargos c ON c.CargoID = e.CargoID
+          WHERE e.JefeDNI = @dni 
+          AND e.EstadoEmpleado = 'Activo'
+          AND c.NombreCargo LIKE '%supervisor%'
+        `;
+      }
+    } else if (cargoId === 4 && campaniaId === 5) {
+      // Analistas: NO tienen subordinados
+      console.log('📋 Analista detectado, sin subordinados:', dni);
+      return [];
+    } else {
+      // Cualquier otro empleado en nivel 1 que no sea jefe ni analista
+      console.log('⚠️ Empleado nivel 1 no reconocido como jefe ni analista:', dni);
+      return [];
     }
   } else if (nivel === 2) {
     // Coordinador: buscar supervisores
@@ -89,6 +129,7 @@ const obtenerSubordinados = async (dni, nivel, cargoId, campaniaId, pool) => {
   
   if (query) {
     const result = await pool.request().input('dni', dni).query(query);
+    console.log(`🔍 Subordinados encontrados para ${dni} (nivel ${nivel}):`, result.recordset.length);
     return result.recordset;
   }
   
