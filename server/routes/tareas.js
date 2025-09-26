@@ -284,12 +284,51 @@ router.put('/:id', authenticateToken, async (req, res) => {
         WHERE Id = @id
       `;
     } else {
-      // Trabajador solo puede actualizar sus tareas
-      query = `
-        UPDATE Tareas 
-        SET Titulo = @titulo, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado
-        WHERE Id = @id AND Responsable = @userDNI
-      `;
+      // Verificar si el usuario tiene subordinados
+      const nivelUsuario = obtenerNivelJerarquico(req.user.cargoNombre, req.user.cargoId, req.user.campaniaId);
+      const subordinados = await obtenerSubordinados(req.user.dni, nivelUsuario, req.user.cargoId, req.user.campaniaId, pool);
+      
+      if (subordinados.length > 0) {
+        // Tiene subordinados: puede actualizar sus tareas y las de sus subordinados
+        const dnisSubordinados = subordinados.map(s => s.DNI);
+        const dnisParaActualizar = [req.user.dni, ...dnisSubordinados];
+        const placeholders = dnisParaActualizar.map((_, index) => `@dni${index}`).join(',');
+        
+        query = `
+          UPDATE Tareas 
+          SET Titulo = @titulo, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado
+          WHERE Id = @id AND Responsable IN (${placeholders})
+        `;
+        
+        const request = pool.request()
+          .input('id', id)
+          .input('titulo', titulo)
+          .input('fechaInicio', fechaInicioISO)
+          .input('fechaFin', fechaFinISO)
+          .input('prioridad', prioridad)
+          .input('estado', estado)
+          .input('observaciones', observaciones || null);
+        
+        dnisParaActualizar.forEach((dni, index) => {
+          request.input(`dni${index}`, dni);
+        });
+        
+        const result = await request.query(query);
+        
+        if (result.rowsAffected[0] === 0) {
+          return res.status(404).json({ error: 'Tarea no encontrada o sin permisos' });
+        }
+        
+        res.json({ message: 'Tarea actualizada exitosamente' });
+        return;
+      } else {
+        // No tiene subordinados: solo puede actualizar sus propias tareas
+        query = `
+          UPDATE Tareas 
+          SET Titulo = @titulo, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado
+          WHERE Id = @id AND Responsable = @userDNI
+        `;
+      }
     }
 
     const result = await pool.request()
@@ -326,8 +365,35 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       // Jefe supremo puede eliminar cualquier tarea
       query = 'DELETE FROM Tareas WHERE Id = @id';
     } else {
-      // Trabajador solo puede eliminar sus tareas
-      query = 'DELETE FROM Tareas WHERE Id = @id AND Responsable = @userDNI';
+      // Verificar si el usuario tiene subordinados
+      const nivelUsuario = obtenerNivelJerarquico(req.user.cargoNombre, req.user.cargoId, req.user.campaniaId);
+      const subordinados = await obtenerSubordinados(req.user.dni, nivelUsuario, req.user.cargoId, req.user.campaniaId, pool);
+      
+      if (subordinados.length > 0) {
+        // Tiene subordinados: puede eliminar sus tareas y las de sus subordinados
+        const dnisSubordinados = subordinados.map(s => s.DNI);
+        const dnisParaEliminar = [req.user.dni, ...dnisSubordinados];
+        const placeholders = dnisParaEliminar.map((_, index) => `@dni${index}`).join(',');
+        
+        query = `DELETE FROM Tareas WHERE Id = @id AND Responsable IN (${placeholders})`;
+        
+        const request = pool.request().input('id', id);
+        dnisParaEliminar.forEach((dni, index) => {
+          request.input(`dni${index}`, dni);
+        });
+        
+        const result = await request.query(query);
+        
+        if (result.rowsAffected[0] === 0) {
+          return res.status(404).json({ error: 'Tarea no encontrada o sin permisos para eliminar' });
+        }
+        
+        res.json({ message: 'Tarea eliminada exitosamente' });
+        return;
+      } else {
+        // No tiene subordinados: solo puede eliminar sus propias tareas
+        query = 'DELETE FROM Tareas WHERE Id = @id AND Responsable = @userDNI';
+      }
     }
     
     const result = await pool.request()
