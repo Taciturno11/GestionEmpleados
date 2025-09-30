@@ -263,7 +263,7 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { titulo, responsable, fechaInicio, fechaFin, prioridad, estado, observaciones } = req.body;
+    const { titulo, responsable, fechaInicio, fechaFin, prioridad, estado, observaciones, progreso } = req.body;
     
     if (!titulo || !responsable || !fechaInicio || !fechaFin || !prioridad || !estado) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' });
@@ -280,7 +280,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       // Jefe supremo puede actualizar cualquier tarea
       query = `
         UPDATE Tareas 
-        SET Titulo = @titulo, Responsable = @responsable, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado, Observaciones = @observaciones
+        SET Titulo = @titulo, Responsable = @responsable, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado, Observaciones = @observaciones, Progreso = @progreso
         WHERE Id = @id
       `;
     } else {
@@ -296,7 +296,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         
         query = `
           UPDATE Tareas 
-          SET Titulo = @titulo, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado
+          SET Titulo = @titulo, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado, Progreso = @progreso
           WHERE Id = @id AND Responsable IN (${placeholders})
         `;
         
@@ -307,7 +307,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
           .input('fechaFin', fechaFinISO)
           .input('prioridad', prioridad)
           .input('estado', estado)
-          .input('observaciones', observaciones || null);
+          .input('observaciones', observaciones || null)
+          .input('progreso', Math.max(0, Math.min(100, parseInt(progreso) || 0)));
         
         dnisParaActualizar.forEach((dni, index) => {
           request.input(`dni${index}`, dni);
@@ -325,7 +326,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         // No tiene subordinados: solo puede actualizar sus propias tareas
         query = `
           UPDATE Tareas 
-          SET Titulo = @titulo, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado
+          SET Titulo = @titulo, FechaInicio = @fechaInicio, FechaFin = @fechaFin, Prioridad = @prioridad, Estado = @estado, Progreso = @progreso
           WHERE Id = @id AND Responsable = @userDNI
         `;
       }
@@ -340,6 +341,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       .input('prioridad', prioridad)
       .input('estado', estado)
       .input('observaciones', observaciones || null)
+      .input('progreso', Math.max(0, Math.min(100, parseInt(progreso) || 0)))
       .input('userDNI', req.user.dni)
       .query(query);
 
