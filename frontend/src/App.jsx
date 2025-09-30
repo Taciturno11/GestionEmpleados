@@ -14,6 +14,10 @@ import FeedbackSemanal from './components/FeedbackSemanal';
 
 import FeedbackEquipo from './components/FeedbackEquipo';
 
+import Notificaciones from './components/Notificaciones';
+
+import Solicitudes from './components/Solicitudes';
+
 
 
 // Configurar axios para usar variables de entorno
@@ -1556,6 +1560,11 @@ function App() {
 
             </div>
 
+            {/* Notificaciones - Solo para usuarios de nivel 1 */}
+            {user && (user.isSupremeBoss || (user.cargoId === 4 && user.campaniaId === 5) || ['002702515', '76157106', '46142691'].includes(user.dni)) && (
+              <Notificaciones user={user} />
+            )}
+
             <button 
 
               className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors font-medium"
@@ -2718,6 +2727,22 @@ function App() {
           {/* Vista Feedback del Equipo - Para jefes con subordinados */}
           {puedeVerDashboard && vistaActiva === 'feedback-equipo' && (
             <FeedbackEquipo />
+          )}
+
+          {/* Vista Solicitudes - Solo para usuarios de nivel 1 */}
+          {vistaActiva === 'solicitudes' && user && (user.isSupremeBoss || (user.cargoId === 4 && user.campaniaId === 5) || ['002702515', '76157106', '46142691'].includes(user.dni)) && (
+            <div className={`${sidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300 ease-in-out`}>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <Solicitudes 
+                  user={user} 
+                  onTareaCreada={() => {
+                    // Recargar tareas cuando se crea una nueva desde una solicitud
+                    cargarTareas();
+                    cargarStats();
+                  }}
+                />
+              </div>
+            </div>
           )}
 
 

@@ -24,6 +24,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tareas', require('./routes/tareas'));
 app.use('/api/feedback', require('./routes/feedback'));
+app.use('/api/solicitudes', require('./routes/solicitudes'));
+app.use('/api/notificaciones', require('./routes/notificaciones'));
 
 // Ruta de prueba
 app.get('/', (req, res) => {
