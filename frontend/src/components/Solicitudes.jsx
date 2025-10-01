@@ -151,7 +151,84 @@ const Solicitudes = ({ user, onTareaCreada }) => {
   // Función para formatear fecha
   const formatearFecha = (fecha) => {
     if (!fecha) return 'No especificada';
-    return new Date(fecha).toLocaleDateString('es-ES');
+    
+    // Si la fecha viene como string ISO, parsearla correctamente
+    let dateToFormat = fecha;
+    if (typeof fecha === 'string' && fecha.includes('T')) {
+      // Es una fecha ISO, usar directamente
+      dateToFormat = fecha;
+    } else if (typeof fecha === 'string' && fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      // Es una fecha en formato YYYY-MM-DD, agregar T00:00:00 para evitar problemas de zona horaria
+      dateToFormat = fecha + 'T00:00:00';
+    }
+    
+    const date = new Date(dateToFormat);
+    
+    // Verificar si la fecha es válida
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    // Usar UTC para evitar problemas de zona horaria
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    
+    return `${day}/${month}/${year}`;
+  };
+
+  // Función para formatear fecha y hora (para FechaSolicitud)
+  const formatearFechaHora = (fecha) => {
+    if (!fecha) return 'No especificada';
+    
+    let dateToFormat = fecha;
+    if (typeof fecha === 'string' && fecha.includes('T')) {
+      dateToFormat = fecha;
+    } else if (typeof fecha === 'string' && fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      dateToFormat = fecha + 'T00:00:00';
+    }
+    
+    const date = new Date(dateToFormat);
+    
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    // Calcular tiempo relativo de forma más simple
+    const ahora = new Date();
+    const diferencia = ahora - date;
+    const minutos = Math.floor(diferencia / (1000 * 60));
+    const horas = Math.floor(diferencia / (1000 * 60 * 60));
+    const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
+    
+    // Si la diferencia es negativa (fecha futura), mostrar fecha completa
+    if (diferencia < 0) {
+      return date.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    if (minutos < 1) {
+      return 'Hace un momento';
+    } else if (minutos < 60) {
+      return `Hace ${minutos}m`;
+    } else if (horas < 24) {
+      return `Hace ${horas}h`;
+    } else if (dias < 7) {
+      return `Hace ${dias}d`;
+    } else {
+      return date.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
   };
 
   return (
@@ -239,7 +316,7 @@ const Solicitudes = ({ user, onTareaCreada }) => {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span>{formatearFecha(solicitud.FechaSolicitud)}</span>
+                        <span>{formatearFechaHora(solicitud.FechaSolicitudISO || solicitud.FechaSolicitud)}</span>
                       </div>
                       {solicitud.FechaInicio && (
                         <div className="flex items-center space-x-1">

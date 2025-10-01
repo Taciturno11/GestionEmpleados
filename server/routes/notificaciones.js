@@ -12,7 +12,8 @@ router.get('/', authenticateToken, async (req, res) => {
       SELECT 
         n.*,
         s.Titulo as SolicitudTitulo,
-        s.Estado as SolicitudEstado
+        s.Estado as SolicitudEstado,
+        FORMAT(n.FechaCreacion AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.fff') + 'Z' as FechaCreacionISO
       FROM Notificaciones n
       LEFT JOIN SolicitudesTareas s ON n.SolicitudId = s.Id
       WHERE n.UsuarioDNI = @usuarioDNI

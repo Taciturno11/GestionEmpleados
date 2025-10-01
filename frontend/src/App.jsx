@@ -2248,6 +2248,7 @@ function App() {
                     <button 
                       className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
                       onClick={() => {
+                        console.log('🔍 DEBUG - Botón Nueva Tarea clickeado, showForm actual:', showForm);
                         setShowForm(!showForm);
                         if (!showForm && user) {
                           setNuevaTarea(prev => ({
@@ -2266,6 +2267,7 @@ function App() {
                 </div>
                 <div className="p-6">
                   {/* Formulario de Nueva Tarea - Movido al principio */}
+                  {console.log('🔍 DEBUG - showForm:', showForm, 'user:', user?.dni, 'isSupremeBoss:', user?.isSupremeBoss, 'subordinados.length:', subordinados.length)}
                   {showForm && (
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
                       <form onSubmit={crearTarea} className="space-y-6">

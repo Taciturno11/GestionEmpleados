@@ -122,8 +122,8 @@ router.post('/', authenticateToken, async (req, res) => {
       .input('fechaFin', fechaFin || null)
       .input('prioridad', prioridad || 'Media')
       .query(`
-        INSERT INTO SolicitudesTareas (Titulo, Descripcion, SolicitanteDNI, SolicitadoDNI, Estado, FechaInicio, FechaFin, Prioridad)
-        VALUES (@titulo, @descripcion, @solicitanteDNI, @solicitadoDNI, @estado, @fechaInicio, @fechaFin, @prioridad);
+        INSERT INTO SolicitudesTareas (Titulo, Descripcion, SolicitanteDNI, SolicitadoDNI, Estado, FechaInicio, FechaFin, Prioridad, FechaSolicitud)
+        VALUES (@titulo, @descripcion, @solicitanteDNI, @solicitadoDNI, @estado, @fechaInicio, @fechaFin, @prioridad, GETUTCDATE());
         SELECT SCOPE_IDENTITY() as Id;
       `);
     
@@ -137,8 +137,8 @@ router.post('/', authenticateToken, async (req, res) => {
       .input('mensaje', `${req.user.nombre} te ha enviado una solicitud: "${titulo}"`)
       .input('solicitudId', solicitudId)
       .query(`
-        INSERT INTO Notificaciones (UsuarioDNI, Tipo, Titulo, Mensaje, SolicitudId)
-        VALUES (@usuarioDNI, @tipo, @titulo, @mensaje, @solicitudId)
+        INSERT INTO Notificaciones (UsuarioDNI, Tipo, Titulo, Mensaje, SolicitudId, FechaCreacion)
+        VALUES (@usuarioDNI, @tipo, @titulo, @mensaje, @solicitudId, GETUTCDATE())
       `);
     
     res.status(201).json({
@@ -159,7 +159,9 @@ router.get('/recibidas', authenticateToken, async (req, res) => {
     const query = `
       SELECT 
         s.*,
-        LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as SolicitanteNombre
+        LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as SolicitanteNombre,
+        FORMAT(s.FechaSolicitud AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.fff') + 'Z' as FechaSolicitudISO,
+        FORMAT(s.FechaRespuesta AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.fff') + 'Z' as FechaRespuestaISO
       FROM SolicitudesTareas s
       LEFT JOIN PRI.Empleados e ON s.SolicitanteDNI = e.DNI
       WHERE s.SolicitadoDNI = @usuarioDNI
@@ -185,7 +187,9 @@ router.get('/enviadas', authenticateToken, async (req, res) => {
     const query = `
       SELECT 
         s.*,
-        LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as SolicitadoNombre
+        LEFT(e.Nombres, CHARINDEX(' ', e.Nombres + ' ') - 1) + ' ' + e.ApellidoPaterno + ' ' + ISNULL(e.ApellidoMaterno, '') as SolicitadoNombre,
+        FORMAT(s.FechaSolicitud AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.fff') + 'Z' as FechaSolicitudISO,
+        FORMAT(s.FechaRespuesta AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.fff') + 'Z' as FechaRespuestaISO
       FROM SolicitudesTareas s
       LEFT JOIN PRI.Empleados e ON s.SolicitadoDNI = e.DNI
       WHERE s.SolicitanteDNI = @usuarioDNI
@@ -285,8 +289,8 @@ router.put('/:id/responder', authenticateToken, async (req, res) => {
       .input('mensaje', mensajeNotificacion)
       .input('solicitudId', id)
       .query(`
-        INSERT INTO Notificaciones (UsuarioDNI, Tipo, Titulo, Mensaje, SolicitudId)
-        VALUES (@usuarioDNI, @tipo, @titulo, @mensaje, @solicitudId)
+        INSERT INTO Notificaciones (UsuarioDNI, Tipo, Titulo, Mensaje, SolicitudId, FechaCreacion)
+        VALUES (@usuarioDNI, @tipo, @titulo, @mensaje, @solicitudId, GETUTCDATE())
       `);
     
     res.json({

@@ -128,18 +128,56 @@ const Notificaciones = ({ user }) => {
 
   // Función para formatear fecha
   const formatearFecha = (fecha) => {
-    const date = new Date(fecha);
+    if (!fecha) return 'No especificada';
+    
+    let dateToFormat = fecha;
+    if (typeof fecha === 'string' && fecha.includes('T')) {
+      dateToFormat = fecha;
+    } else if (typeof fecha === 'string' && fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      dateToFormat = fecha + 'T00:00:00';
+    }
+    
+    const date = new Date(dateToFormat);
+    
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    // Calcular tiempo relativo de forma más simple
     const ahora = new Date();
-    const diffMs = ahora - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Ahora';
-    if (diffMins < 60) return `Hace ${diffMins}m`;
-    if (diffHours < 24) return `Hace ${diffHours}h`;
-    if (diffDays < 7) return `Hace ${diffDays}d`;
-    return date.toLocaleDateString('es-ES');
+    const diferencia = ahora - date;
+    const minutos = Math.floor(diferencia / (1000 * 60));
+    const horas = Math.floor(diferencia / (1000 * 60 * 60));
+    const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
+    
+    // Si la diferencia es negativa (fecha futura), mostrar fecha completa
+    if (diferencia < 0) {
+      return date.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    
+    if (minutos < 1) {
+      return 'Hace un momento';
+    } else if (minutos < 60) {
+      return `Hace ${minutos}m`;
+    } else if (horas < 24) {
+      return `Hace ${horas}h`;
+    } else if (dias < 7) {
+      return `Hace ${dias}d`;
+    } else {
+      return date.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
   };
 
   return (
@@ -211,7 +249,7 @@ const Notificaciones = ({ user }) => {
                           {notificacion.Titulo}
                         </h4>
                         <span className="text-xs text-gray-500">
-                          {formatearFecha(notificacion.FechaCreacion)}
+                          {formatearFecha(notificacion.FechaCreacionISO || notificacion.FechaCreacion)}
                         </span>
                       </div>
                       <p className={`text-sm mt-1 ${!notificacion.Leida ? 'text-gray-800' : 'text-gray-600'}`}>
