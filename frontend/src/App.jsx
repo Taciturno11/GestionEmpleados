@@ -63,6 +63,10 @@ function App() {
   const [empleadosConTareas, setEmpleadosConTareas] = useState([]);
   const [puedeVerDashboard, setPuedeVerDashboard] = useState(false);
   const [vistaTareasActiva, setVistaTareasActiva] = useState('propias'); // 'propias' o 'equipo'
+  
+  // Estados para paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const [tareasPorPagina] = useState(8);
   // Función helper para obtener la fecha local en formato YYYY-MM-DD
   const getCurrentDate = () => {
     const now = new Date();
@@ -71,6 +75,26 @@ function App() {
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+
+  // Funciones de paginación
+  const obtenerTareasPaginadas = (tareas) => {
+    const inicio = (paginaActual - 1) * tareasPorPagina;
+    const fin = inicio + tareasPorPagina;
+    return tareas.slice(inicio, fin);
+  };
+
+  const obtenerTotalPaginas = (tareas) => {
+    return Math.ceil(tareas.length / tareasPorPagina);
+  };
+
+  const cambiarPagina = (nuevaPagina) => {
+    setPaginaActual(nuevaPagina);
+  };
+
+  // Resetear paginación cuando cambie la vista de tareas
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [vistaTareasActiva, user]);
 
   const [nuevaTarea, setNuevaTarea] = useState({
 
@@ -1689,215 +1713,6 @@ function App() {
 
 
 
-            {/* Form */}
-
-            {showForm && (
-
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-
-                <form onSubmit={crearTarea} className="space-y-6">
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                    <div>
-
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-
-                        Título de la tarea
-
-                      </label>
-
-                      <input
-
-                        type="text"
-
-                        value={nuevaTarea.titulo}
-
-                        onChange={(e) => setNuevaTarea({...nuevaTarea, titulo: e.target.value})}
-
-                        className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-
-                        required
-
-                      />
-
-                    </div>
-
-                    
-
-                    <div>
-
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-
-                        Responsable
-
-                      </label>
-
-                        <input
-
-                          type="text"
-
-                          value={user.nombre}
-
-                          disabled
-
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
-
-                        />
-
-                    </div>
-
-                    
-
-                    <div>
-
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-
-                        Prioridad
-
-                      </label>
-
-                      <select
-
-                        value={nuevaTarea.prioridad}
-
-                        onChange={(e) => setNuevaTarea({...nuevaTarea, prioridad: e.target.value})}
-
-                        className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-
-                      >
-
-                        <option value="Alta">Alta</option>
-
-                        <option value="Media">Media</option>
-
-                        <option value="Baja">Baja</option>
-
-                      </select>
-
-                    </div>
-
-                    
-
-                    <div>
-
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-
-                        Fecha de inicio
-
-                      </label>
-
-                      <input
-
-                        type="date"
-
-                        value={nuevaTarea.fechaInicio}
-
-                        onChange={(e) => setNuevaTarea({...nuevaTarea, fechaInicio: e.target.value})}
-
-                        className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-
-                        required
-
-                      />
-
-                    </div>
-
-                    
-
-                    <div>
-
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-
-                        Fecha de fin
-
-                      </label>
-
-                      <input
-
-                        type="date"
-
-                        value={nuevaTarea.fechaFin}
-
-                        onChange={(e) => setNuevaTarea({...nuevaTarea, fechaFin: e.target.value})}
-
-                        className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-
-                        required
-
-                      />
-
-                    </div>
-
-                    
-
-                    <div>
-
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-
-                        Estado
-
-                      </label>
-
-                      <select
-
-                        value={nuevaTarea.estado}
-
-                        onChange={(e) => setNuevaTarea({...nuevaTarea, estado: e.target.value})}
-
-                        className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-
-                      >
-
-                        <option value="Pendiente">Pendiente</option>
-
-                        <option value="En Progreso">En Progreso</option>
-
-                        <option value="Terminado">Terminado</option>
-
-                      </select>
-
-                    </div>
-
-                  </div>
-
-                  
-
-                  <div className="flex justify-end space-x-3">
-
-                    <button
-
-                      type="button"
-
-                      onClick={() => setShowForm(false)}
-
-                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200 font-medium"
-
-                    >
-
-                      Cancelar
-
-                    </button>
-
-                    <button
-
-                      type="submit"
-
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium"
-
-                    >
-
-                      Crear Tarea
-
-                    </button>
-
-                  </div>
-
-                </form>
-
-              </div>
-
-            )}
 
 
 
@@ -2450,6 +2265,147 @@ function App() {
                   </div>
                 </div>
                 <div className="p-6">
+                  {/* Formulario de Nueva Tarea - Movido al principio */}
+                  {showForm && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+                      <form onSubmit={crearTarea} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Título
+                            </label>
+                            <input
+                              type="text"
+                              value={nuevaTarea.titulo}
+                              onChange={(e) => setNuevaTarea({...nuevaTarea, titulo: e.target.value})}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              required
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Responsable
+                            </label>
+                            {(user.isSupremeBoss || subordinados.length > 0) ? (
+                              <select
+                                value={nuevaTarea.responsable}
+                                onChange={(e) => setNuevaTarea({...nuevaTarea, responsable: e.target.value})}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                required
+                              >
+                                <option value="">Seleccionar responsable</option>
+                                <option value={user.dni}>Yo mismo - {user.nombre}</option>
+                                {subordinados.map(subordinado => (
+                                  <option key={subordinado.DNI} value={subordinado.DNI}>
+                                    {subordinado.Nombres} {subordinado.ApellidoPaterno} - {subordinado.NombreCargo}
+                                  </option>
+                                ))}
+                                {user.isSupremeBoss && usuarios.map(usuario => (
+                                  <option key={usuario.DNI} value={usuario.DNI}>
+                                    {usuario.Nombres} {usuario.ApellidoPaterno}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={user.nombre}
+                                disabled
+                                className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
+                              />
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Fecha Inicio
+                            </label>
+                            <input
+                              type="date"
+                              value={nuevaTarea.fechaInicio}
+                              onChange={(e) => setNuevaTarea({...nuevaTarea, fechaInicio: e.target.value})}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              required
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Fecha Fin
+                            </label>
+                            <input
+                              type="date"
+                              value={nuevaTarea.fechaFin}
+                              onChange={(e) => setNuevaTarea({...nuevaTarea, fechaFin: e.target.value})}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              required
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Prioridad
+                            </label>
+                            <select
+                              value={nuevaTarea.prioridad}
+                              onChange={(e) => setNuevaTarea({...nuevaTarea, prioridad: e.target.value})}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                              <option value="Baja">Baja</option>
+                              <option value="Media">Media</option>
+                              <option value="Alta">Alta</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Estado
+                            </label>
+                            <select
+                              value={nuevaTarea.estado}
+                              onChange={(e) => setNuevaTarea({...nuevaTarea, estado: e.target.value})}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                              <option value="Pendiente">Pendiente</option>
+                              <option value="En Progreso">En Progreso</option>
+                              <option value="Terminado">Terminado</option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Observaciones
+                          </label>
+                          <textarea
+                            value={nuevaTarea.observaciones}
+                            onChange={(e) => setNuevaTarea({...nuevaTarea, observaciones: e.target.value})}
+                            rows={3}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            placeholder="Descripción adicional de la tarea..."
+                          />
+                        </div>
+                        
+                        <div className="flex justify-end space-x-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowForm(false)}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200 font-medium"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium"
+                          >
+                            Crear Tarea
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
                   {/* Vista única que cambia según el toggle */}
                   <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
                     <div className="px-6 py-4 bg-gradient-to-r border-b border-gray-200" style={{
@@ -2549,6 +2505,10 @@ function App() {
                             // Aplicar ordenamiento: tareas completadas al final
                             const tareasOrdenadas = obtenerTareasProcesadas(tareasAMostrar);
                             
+                            // Aplicar paginación
+                            const tareasPaginadas = obtenerTareasPaginadas(tareasOrdenadas);
+                            const totalPaginas = obtenerTotalPaginas(tareasOrdenadas);
+                            
                             const mostrarResponsable = user.isSupremeBoss || vistaTareasActiva === 'equipo';
                             
                             console.log('🔍 FRONTEND - Renderizando tareas:', {
@@ -2556,13 +2516,16 @@ function App() {
                               userIsSupremeBoss: user.isSupremeBoss,
                               tareasAMostrar: tareasAMostrar.length,
                               tareasOrdenadas: tareasOrdenadas.length,
+                              tareasPaginadas: tareasPaginadas.length,
+                              paginaActual,
+                              totalPaginas,
                               tareasAMostrarDetalle: tareasAMostrar.map(t => ({ id: t.Id, titulo: t.Titulo, responsable: t.Responsable, progreso: t.Progreso, estado: t.Estado })),
                               mostrarResponsable
                             });
                             
-                            if (tareasOrdenadas.length > 0) {
-                              console.log('🔍 FRONTEND - Mapeando tareas para renderizar:', tareasOrdenadas.length);
-                              return tareasOrdenadas.map((tarea) => renderTareaRow(tarea, mostrarResponsable));
+                            if (tareasPaginadas.length > 0) {
+                              console.log('🔍 FRONTEND - Mapeando tareas para renderizar:', tareasPaginadas.length);
+                              return tareasPaginadas.map((tarea) => renderTareaRow(tarea, mostrarResponsable));
                             } else {
                               const colSpan = mostrarResponsable ? 7 : 6;
                               return (
@@ -2590,136 +2553,121 @@ function App() {
                       </table>
                     </div>
                   </div>
+                  
+                  {/* Componente de Paginación */}
+                  {(() => {
+                    const tareasAMostrar = user.isSupremeBoss 
+                      ? tareasEquipo 
+                      : vistaTareasActiva === 'propias' 
+                        ? tareasPropias 
+                        : tareasEquipo;
+                    
+                    const tareasOrdenadas = obtenerTareasProcesadas(tareasAMostrar);
+                    const totalPaginas = obtenerTotalPaginas(tareasOrdenadas);
+                    
+                    if (totalPaginas <= 1) return null;
+                    
+                    return (
+                      <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                        <div className="flex-1 flex justify-between sm:hidden">
+                          <button
+                            onClick={() => cambiarPagina(paginaActual - 1)}
+                            disabled={paginaActual === 1}
+                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Anterior
+                          </button>
+                          <button
+                            onClick={() => cambiarPagina(paginaActual + 1)}
+                            disabled={paginaActual === totalPaginas}
+                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Siguiente
+                          </button>
+                        </div>
+                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm text-gray-700">
+                              Mostrando{' '}
+                              <span className="font-medium">
+                                {Math.min((paginaActual - 1) * tareasPorPagina + 1, tareasOrdenadas.length)}
+                              </span>{' '}
+                              a{' '}
+                              <span className="font-medium">
+                                {Math.min(paginaActual * tareasPorPagina, tareasOrdenadas.length)}
+                              </span>{' '}
+                              de{' '}
+                              <span className="font-medium">{tareasOrdenadas.length}</span>{' '}
+                              resultados
+                            </p>
+                          </div>
+                          <div>
+                            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                              <button
+                                onClick={() => cambiarPagina(paginaActual - 1)}
+                                disabled={paginaActual === 1}
+                                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <span className="sr-only">Anterior</span>
+                                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                              
+                              {/* Números de página */}
+                              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((numero) => {
+                                // Mostrar solo algunas páginas alrededor de la actual
+                                const mostrarPagina = 
+                                  numero === 1 || 
+                                  numero === totalPaginas || 
+                                  (numero >= paginaActual - 1 && numero <= paginaActual + 1);
+                                
+                                if (!mostrarPagina) {
+                                  // Mostrar puntos suspensivos
+                                  if (numero === paginaActual - 2 || numero === paginaActual + 2) {
+                                    return (
+                                      <span key={numero} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                        ...
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                }
+                                
+                                return (
+                                  <button
+                                    key={numero}
+                                    onClick={() => cambiarPagina(numero)}
+                                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                      numero === paginaActual
+                                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {numero}
+                                  </button>
+                                );
+                              })}
+                              
+                              <button
+                                onClick={() => cambiarPagina(paginaActual + 1)}
+                                disabled={paginaActual === totalPaginas}
+                                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <span className="sr-only">Siguiente</span>
+                                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </nav>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
-              {/* Formulario de Nueva Tarea */}
-              {showForm && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-                  <form onSubmit={crearTarea} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Título
-                        </label>
-                        <input
-                          type="text"
-                          value={nuevaTarea.titulo}
-                          onChange={(e) => setNuevaTarea({...nuevaTarea, titulo: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                          required
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Responsable
-                        </label>
-                        {(user.isSupremeBoss || subordinados.length > 0) ? (
-                          <select
-                            value={nuevaTarea.responsable}
-                            onChange={(e) => setNuevaTarea({...nuevaTarea, responsable: e.target.value})}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            required
-                          >
-                            <option value="">Seleccionar responsable</option>
-                            <option value={user.dni}>Yo mismo - {user.nombre}</option>
-                            {subordinados.map(subordinado => (
-                              <option key={subordinado.DNI} value={subordinado.DNI}>
-                                {subordinado.Nombres} {subordinado.ApellidoPaterno} - {subordinado.NombreCargo}
-                              </option>
-                            ))}
-                            {user.isSupremeBoss && usuarios.map(usuario => (
-                              <option key={usuario.DNI} value={usuario.DNI}>
-                                {usuario.Nombres} {usuario.ApellidoPaterno}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={user.nombre}
-                            disabled
-                            className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
-                          />
-                        )}
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Prioridad
-                        </label>
-                        <select
-                          value={nuevaTarea.prioridad}
-                          onChange={(e) => setNuevaTarea({...nuevaTarea, prioridad: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        >
-                          <option value="Alta">Alta</option>
-                          <option value="Media">Media</option>
-                          <option value="Baja">Baja</option>
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Fecha de inicio
-                        </label>
-                        <input
-                          type="date"
-                          value={nuevaTarea.fechaInicio}
-                          onChange={(e) => setNuevaTarea({...nuevaTarea, fechaInicio: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                          required
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Fecha de fin
-                        </label>
-                        <input
-                          type="date"
-                          value={nuevaTarea.fechaFin}
-                          onChange={(e) => setNuevaTarea({...nuevaTarea, fechaFin: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                          required
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Estado
-                        </label>
-                        <select
-                          value={nuevaTarea.estado}
-                          onChange={(e) => setNuevaTarea({...nuevaTarea, estado: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        >
-                          <option value="Pendiente">Pendiente</option>
-                          <option value="En Progreso">En Progreso</option>
-                          <option value="Terminado">Terminado</option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end space-x-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowForm(false)}
-                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200 font-medium"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium"
-                      >
-                        Crear Tarea
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
             </>
           )}
 
