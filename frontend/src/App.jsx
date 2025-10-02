@@ -1637,72 +1637,6 @@ function App() {
           {vistaActiva === 'dashboard' && !puedeVerDashboard && (
             <>
 
-            {/* Task Management */}
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-
-                <div className="flex flex-wrap gap-2">
-
-                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-blue-600 text-white">
-
-                    Todas
-
-                  </button>
-
-                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-
-                    Pendientes
-
-                  </button>
-
-                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-
-                    En Progreso
-
-                  </button>
-
-                  <button className="px-4 py-2 rounded-md font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200">
-
-                    Completadas
-
-                  </button>
-
-                </div>
-
-                <button 
-
-                  className="bg-blue-600 text-white px-6 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors"
-
-                    onClick={() => {
-
-                      setShowForm(!showForm);
-
-                      if (!showForm && user) {
-
-                        setNuevaTarea(prev => ({
-
-                          ...prev,
-
-                          responsable: user.dni
-
-                        }));
-
-                      }
-
-                    }}
-
-                >
-
-                  + Nueva Tarea
-
-                </button>
-
-              </div>
-
-            </div>
-
 
 
             {/* Feedback Semanal */}
@@ -1716,29 +1650,146 @@ function App() {
 
 
 
-            {/* Tasks Table - Pizarra Moderna */}
-
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-
+            {/* Gestión de Tareas - Sección Unificada */}
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl shadow-lg border border-slate-200 overflow-hidden mb-8">
+              
+              {/* Header con título y botón Nueva Tarea */}
               <div className="px-6 py-5 bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-300">
-
-                <div className="flex items-center space-x-3">
-
-                  <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-
-                    </svg>
-
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-white">📋 Gestión de Tareas</h3>
                   </div>
-
-                  <h3 className="text-xl font-bold text-white">📋 Mis Tareas</h3>
-
+                  
+                  <button 
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                    onClick={() => {
+                      setShowForm(!showForm);
+                      if (!showForm && user) {
+                        setNuevaTarea(prev => ({
+                          ...prev,
+                          responsable: user.dni
+                        }));
+                      }
+                    }}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Nueva Tarea</span>
+                  </button>
                 </div>
-
               </div>
+
+              {/* Formulario de Nueva Tarea - Aparece debajo del header, encima de los registros */}
+              {showForm && (
+                <div className="bg-white border-b border-gray-200 p-6">
+                  <form onSubmit={crearTarea} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Título
+                        </label>
+                        <input
+                          type="text"
+                          value={nuevaTarea.titulo}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, titulo: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Responsable
+                        </label>
+                        <input
+                          type="text"
+                          value={user.nombre}
+                          disabled
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Fecha Inicio
+                        </label>
+                        <input
+                          type="date"
+                          value={nuevaTarea.fechaInicio}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, fechaInicio: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Fecha Fin
+                        </label>
+                        <input
+                          type="date"
+                          value={nuevaTarea.fechaFin}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, fechaFin: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Prioridad
+                        </label>
+                        <select
+                          value={nuevaTarea.prioridad}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, prioridad: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        >
+                          <option value="Baja">Baja</option>
+                          <option value="Media">Media</option>
+                          <option value="Alta">Alta</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Estado
+                        </label>
+                        <select
+                          value={nuevaTarea.estado}
+                          onChange={(e) => setNuevaTarea({...nuevaTarea, estado: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        >
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="En Progreso">En Progreso</option>
+                          <option value="Terminado">Terminado</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowForm(false)}
+                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors duration-200 font-medium"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium"
+                      >
+                        Crear Tarea
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               <div className="overflow-x-auto bg-white">
 
@@ -2374,19 +2425,6 @@ function App() {
                               <option value="Terminado">Terminado</option>
                             </select>
                           </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Observaciones
-                          </label>
-                          <textarea
-                            value={nuevaTarea.observaciones}
-                            onChange={(e) => setNuevaTarea({...nuevaTarea, observaciones: e.target.value})}
-                            rows={3}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            placeholder="Descripción adicional de la tarea..."
-                          />
                         </div>
                         
                         <div className="flex justify-end space-x-3">
