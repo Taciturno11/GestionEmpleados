@@ -1,6 +1,7 @@
+
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'holademar';
+const JWT_SECRET = process.env.JWT;
 
 // Función para determinar el nivel jerárquico basado en el cargo
 const obtenerNivelJerarquico = (cargo, cargoId, campaniaId) => {

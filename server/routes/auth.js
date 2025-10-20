@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const { connectDB } = require('../config/database');
 const { obtenerNivelJerarquico, obtenerSubordinados } = require('../middleware/auth');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'holademar';
+const JWT_SECRET = process.env.JWT;
 
 // POST - Login
 router.post('/login', async (req, res) => {

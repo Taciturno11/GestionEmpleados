@@ -8,8 +8,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
-      host: env.VITE_FRONTEND_HOST || '0.0.0.0',
-      port: parseInt(env.VITE_FRONTEND_PORT) || 5173,
+      host: true,
+      port: parseInt(env.VITE_FRONTEND_PORT),
     }
   }
 })
