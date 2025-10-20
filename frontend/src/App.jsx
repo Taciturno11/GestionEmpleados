@@ -22,14 +22,11 @@ import Solicitudes from './components/Solicitudes';
 
 // Configurar axios para usar variables de entorno
 const api = axios.create({
-
-  baseURL: `${import.meta.env.VITE_BACKEND_URL || 'http://10.8.2.56:3000'}/api`,
+  baseURL: `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api`,
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT) || 10000,
   headers: {
-
     'Content-Type': 'application/json'
-
   }
-
 });
 
 

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start:prod": "NODE_ENV=production node index.js"
   },
   "keywords": ["express", "sql", "api", "tareas"],
   "author": "Partner Design Thinking",

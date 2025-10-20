@@ -1,10 +1,11 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://10.8.2.56:3000/api';
+// Configuración usando variables de entorno
+const API_BASE_URL = `${import.meta.env.VITE_BACKEND_URL}/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT) || 10000,
   headers: {
     'Content-Type': 'application/json',
   },

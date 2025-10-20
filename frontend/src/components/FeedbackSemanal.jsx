@@ -17,7 +17,8 @@ const FeedbackSemanal = ({ empleadoDNI }) => {
 
   // Configurar axios
   const api = axios.create({
-    baseURL: `${import.meta.env.VITE_BACKEND_URL}/api`,
+    baseURL: `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api`,
+    timeout: parseInt(import.meta.env.VITE_API_TIMEOUT) || 10000,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${localStorage.getItem('token')}`
