@@ -18,6 +18,8 @@ import Notificaciones from './components/Notificaciones';
 
 import Solicitudes from './components/Solicitudes';
 
+import Correo from './components/Correo';
+
 
 
 // Configurar axios para usar variables de entorno
@@ -1628,6 +1630,11 @@ function App() {
               empleados={puedeVerDashboard ? empleados : []} 
               userDNI={user.dni} 
             />
+          )}
+
+          {/* Vista Correo - Para todos los usuarios */}
+          {vistaActiva === 'correo' && (
+            <Correo />
           )}
 
           {/* Vista Mis Tareas - Para usuarios sin subordinados */}
